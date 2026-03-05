@@ -1,0 +1,18 @@
+Iteration: 1
+Time: 2026-03-05 14:34:45
+Excel: batch_test_log_20260305143433.xlsx
+Duration: 12.482s
+Cases: 218
+Signal Accuracy: best=57.99% top10avg=57.03% avg=53.51% worst=51.96%
+
+=== TOP 10 ===
+ 1. #5   Bo13M22_w1+Br15_w1                       Acc=57.99% Rate=12.3% Str=1.405 Avg=-0.044
+ 2. #6   Bo13M22_w1+Br15_w2                       Acc=57.99% Rate=12.3% Str=2.279 Avg=-0.096
+ 3. #7   Bo13M22_w2+Br15_w1                       Acc=57.99% Rate=12.3% Str=1.935 Avg=-0.036
+ 4. #8   Bo13M22_w2+Br15_w2                       Acc=57.99% Rate=12.3% Str=2.809 Avg=-0.088
+ 5. #192 R7_w2+Bo13M2.2+Br15                      Acc=56.40% Rate=23.3% Str=2.215 Avg=-0.070
+ 6. #191 R7_w1+Bo13M2.2+Br15                      Acc=56.40% Rate=23.3% Str=1.477 Avg=-0.047
+ 7. #1   Bo13M22_w1+R7_8020_w1                    Acc=56.40% Rate=20.3% Str=1.167 Avg=-0.022
+ 8. #2   Bo13M22_w1+R7_8020_w2                    Acc=56.40% Rate=20.3% Str=2.014 Avg=-0.049
+ 9. #3   Bo13M22_w2+R7_8020_w1                    Acc=56.40% Rate=20.3% Str=1.487 Avg=-0.017
+10. #4   Bo13M22_w2+R7_8020_w2                    Acc=56.40% Rate=20.3% Str=2.334 Avg=-0.044

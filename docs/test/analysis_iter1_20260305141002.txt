@@ -1,0 +1,18 @@
+Iteration: 1
+Time: 2026-03-05 14:10:02
+Excel: batch_test_log_20260305141002.xlsx
+Duration: 411ms
+Cases: 20
+Signal Accuracy: best=52.78% top10avg=52.40% avg=49.96% worst=47.14%
+
+=== TOP 10 ===
+ 1. #4   PriceVsMA_P8_w-1                         Acc=52.78% Rate=100.0% Str=1.000 Avg=-0.023
+ 2. #2   PriceVsMA_P5_w-1                         Acc=52.71% Rate=100.0% Str=1.000 Avg=-0.013
+ 3. #6   PriceVsMA_P10_w-1                        Acc=52.64% Rate=100.0% Str=1.000 Avg=-0.025
+ 4. #8   PriceVsMA_P12_w-1                        Acc=52.55% Rate=100.0% Str=1.000 Avg=-0.028
+ 5. #10  PriceVsMA_P15_w-1                        Acc=52.51% Rate=100.0% Str=1.000 Avg=-0.031
+ 6. #12  PriceVsMA_P20_w-1                        Acc=52.40% Rate=100.0% Str=1.000 Avg=-0.032
+ 7. #14  PriceVsMA_P25_w-1                        Acc=52.37% Rate=100.0% Str=1.000 Avg=-0.037
+ 8. #16  PriceVsMA_P30_w-1                        Acc=52.24% Rate=100.0% Str=1.000 Avg=-0.036
+ 9. #18  PriceVsMA_P40_w-1                        Acc=51.98% Rate=100.0% Str=1.000 Avg=-0.036
+10. #20  PriceVsMA_P50_w-1                        Acc=51.83% Rate=100.0% Str=1.000 Avg=-0.037

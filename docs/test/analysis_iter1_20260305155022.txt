@@ -1,0 +1,21 @@
+Iteration: 1
+Time: 2026-03-05 15:50:22
+Excel: batch_test_log_20260305155016.xlsx
+Duration: 5.203s
+Cases: 96
+Signal Accuracy: best=52.92% top10avg=52.91% avg=52.80% worst=52.66%
+
+=== TOP 10 ===
+ 1. #36  R7+Bo12M2.0+Br12+A20+Sess0.50            Acc=52.92% Rate=81.4% Str=1.315 Avg=-0.020
+ 2. #35  R7+Bo12M2.0+Br12+A20+Sess0.25            Acc=52.92% Rate=81.4% Str=1.121 Avg=-0.018
+ 3. #59  R7+Bo13M2.2+Br12+A20+Sess0.25            Acc=52.91% Rate=81.2% Str=1.080 Avg=-0.018
+ 4. #60  R7+Bo13M2.2+Br12+A20+Sess0.50            Acc=52.91% Rate=81.2% Str=1.275 Avg=-0.019
+ 5. #44  R7+Bo12M2.2+Br12+A20+Sess0.50            Acc=52.91% Rate=81.2% Str=1.271 Avg=-0.020
+ 6. #43  R7+Bo12M2.2+Br12+A20+Sess0.25            Acc=52.91% Rate=81.2% Str=1.075 Avg=-0.018
+ 7. #51  R7+Bo13M2.0+Br12+A20+Sess0.25            Acc=52.91% Rate=81.4% Str=1.125 Avg=-0.018
+ 8. #52  R7+Bo13M2.0+Br12+A20+Sess0.50            Acc=52.91% Rate=81.4% Str=1.319 Avg=-0.020
+ 9. #39  R7+Bo12M2.0+Br15+A20+Sess0.25            Acc=52.90% Rate=81.2% Str=1.101 Avg=-0.018
+10. #40  R7+Bo12M2.0+Br15+A20+Sess0.50            Acc=52.90% Rate=81.2% Str=1.296 Avg=-0.020
+
+=== 各组策略最优参数 ===
+Bo+R+Br+A+Sess     R7+Bo12M2.0+Br12+A20+Sess0.25              Acc=52.92% Rate=81.4% | Bo P12 M2.0 w1.0 RSI P7 80/20 w1.0 Br P12 w1.0 ATR P20 w1.0 Sess w0.2

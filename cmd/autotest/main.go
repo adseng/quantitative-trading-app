@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,11 +10,10 @@ import (
 	"time"
 
 	"quantitative-trading-app/internal/batchtest"
+	"quantitative-trading-app/internal/batchtest/cases"
 	"quantitative-trading-app/internal/datafile"
 	"quantitative-trading-app/internal/factor"
 )
-
-const casesPerIter = 200
 
 type iterSummary struct {
 	iter      int
@@ -29,12 +26,10 @@ type iterSummary struct {
 }
 
 func main() {
-	loops := flag.Int("n", 1, "number of evolution iterations")
 	dataPath := flag.String("data", datafile.DefaultPath, "path to kline data file")
 	flag.Parse()
 
-	fmt.Println("=== Evolutionary Auto Test ===")
-	fmt.Printf("总轮数: %d | 每轮用例: %d\n", *loops, casesPerIter)
+	fmt.Println("=== 策略回测测试 ===")
 	fmt.Printf("数据文件: %s\n\n", *dataPath)
 
 	fmt.Println("[加载数据] 读取本地K线文件...")
@@ -45,76 +40,22 @@ func main() {
 	}
 	fmt.Printf("[加载数据] 完成，共 %d 根K线 (%.0f天)\n\n", len(klines), float64(len(klines))*15/60/24)
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	var summaries []iterSummary
-	currentCases := batchtest.GenerateTestCases()
-	var globalBestAcc float64
-	var globalBestName string
-	staleCount := 0
+	// 仅调用 GenerateTestCases，不做进化。优化流程：执行脚本 → 分析结果 → 更新 case_*.go → 再执行
+	cases := cases.GenerateTestCases()
+	fmt.Printf("[策略] GenerateTestCases 生成 %d 组用例\n\n", len(cases))
 
-	for iter := 1; iter <= *loops; iter++ {
-		fmt.Printf("┌─────────────────────────────────────────┐\n")
-		fmt.Printf("│          第 %2d / %2d 轮                   │\n", iter, *loops)
-		fmt.Printf("└─────────────────────────────────────────┘\n")
+	s, _ := runOneIteration(1, klines, cases)
 
-		if iter == 1 {
-			fmt.Println("[策略] 使用 V4 手工设计的初始种群 (200组)")
-			fmt.Println("  思路: Boll/Break/RSI 三大核心因子的参数精细网格搜索")
-		} else {
-			printEvolutionStrategy(summaries, staleCount)
-		}
-
-		s, results := runOneIteration(iter, klines, currentCases)
-		summaries = append(summaries, s)
-
-		prevBest := globalBestAcc
-		if s.bestAcc > globalBestAcc {
-			globalBestAcc = s.bestAcc
-			globalBestName = s.bestName
-			staleCount = 0
-			fmt.Printf("  ★ 发现新的全局最优! %.2f%% → %.2f%% (+%.2f%%)\n",
-				prevBest*100, globalBestAcc*100, (globalBestAcc-prevBest)*100)
-		} else {
-			staleCount++
-			fmt.Printf("  - 本轮未突破全局最优 (已连续 %d 轮停滞)\n", staleCount)
-		}
-		fmt.Printf("  本轮最佳: %.2f%% (%s)\n", s.bestAcc*100, s.bestName)
-		fmt.Printf("  全局最佳: %.2f%% (%s)\n", globalBestAcc*100, globalBestName)
-
-		if iter < *loops {
-			fmt.Println("\n[进化] 生成下一代种群...")
-			currentCases = evolve(results, rng, staleCount)
-		}
-		fmt.Println()
-	}
-
-	printTrend(summaries, globalBestAcc, globalBestName)
-
+	printTrend([]iterSummary{s}, s.bestAcc, s.bestName)
 	trendFile := filepath.Join(batchtest.ExcelDirPath(),
 		fmt.Sprintf("trend_%s.txt", time.Now().Format("20060102150405")))
-	writeTrendFile(trendFile, summaries, globalBestAcc, globalBestName)
-	fmt.Printf("趋势文件: %s\n", trendFile)
+	writeTrendFile(trendFile, []iterSummary{s}, s.bestAcc, s.bestName)
+	fmt.Printf("\n趋势文件: %s\n", trendFile)
 }
 
-func printEvolutionStrategy(summaries []iterSummary, staleCount int) {
-	last := summaries[len(summaries)-1]
-	fmt.Printf("[策略] 上轮 best=%.2f%% avg=%.2f%%\n", last.bestAcc*100, last.avgAcc*100)
-
-	if staleCount == 0 {
-		fmt.Println("  思路: 上轮有提升 → 在最优参数附近继续精细搜索")
-		fmt.Println("  构成: 20精英 + 120变异(小幅微调) + 40交叉 + 20随机探索")
-	} else if staleCount < 5 {
-		fmt.Printf("  思路: 已停滞%d轮 → 保持精英，加大变异幅度寻找新方向\n", staleCount)
-		fmt.Println("  构成: 20精英 + 120变异(扩大搜索范围) + 40交叉 + 20随机")
-	} else {
-		fmt.Printf("  思路: 停滞%d轮 → 可能已接近全局最优或陷入局部最优\n", staleCount)
-		fmt.Println("  构成: 20精英 + 120变异(大幅探索) + 40交叉 + 20随机")
-	}
-}
-
-func runOneIteration(iter int, klines []*factor.KLine, cases []batchtest.TestCase) (iterSummary, []batchtest.TestResult) {
-	runner := batchtest.NewBatchRunnerWithCases(cases)
-	fmt.Printf("[回测] 开始 %d 组参数回测...\n", len(cases))
+func runOneIteration(iter int, klines []*factor.KLine, testCases []cases.TestCase) (iterSummary, []cases.TestResult) {
+	runner := batchtest.NewBatchRunnerWithCases(testCases)
+	fmt.Printf("[回测] 开始 %d 组参数回测...\n", len(testCases))
 	start := time.Now()
 
 	runner.Run(klines, func(evt batchtest.ProgressEvent) {
@@ -145,10 +86,11 @@ func runOneIteration(iter int, klines []*factor.KLine, cases []batchtest.TestCas
 	}
 
 	printFactorDistribution(results)
+	printPerGroupBest(results)
 
 	logFile := filepath.Join(batchtest.ExcelDirPath(),
 		fmt.Sprintf("analysis_iter%d_%s.txt", iter, time.Now().Format("20060102150405")))
-	writeAnalysisLog(logFile, iter, runner.ExcelFile(), a, elapsed)
+	writeAnalysisLog(logFile, iter, runner.ExcelFile(), a, elapsed, results)
 
 	s := iterSummary{
 		iter:      iter,
@@ -164,8 +106,8 @@ func runOneIteration(iter int, klines []*factor.KLine, cases []batchtest.TestCas
 	return s, results
 }
 
-func printFactorDistribution(results []batchtest.TestResult) {
-	sorted := make([]batchtest.TestResult, len(results))
+func printFactorDistribution(results []cases.TestResult) {
+	sorted := make([]cases.TestResult, len(results))
 	copy(sorted, results)
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i].SignalAccuracy > sorted[j].SignalAccuracy
@@ -202,419 +144,24 @@ func printFactorDistribution(results []batchtest.TestResult) {
 		bollCnt, brkCnt, rsiCnt, atrCnt, volCnt, otherCnt)
 }
 
-// ======================== EVOLUTION ========================
-
-func evolve(results []batchtest.TestResult, rng *rand.Rand, staleCount int) []batchtest.TestCase {
-	sorted := make([]batchtest.TestResult, len(results))
-	copy(sorted, results)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].SignalAccuracy > sorted[j].SignalAccuracy
-	})
-
-	cases := make([]batchtest.TestCase, 0, casesPerIter)
-	id := 0
-	add := func(prefix string, tc batchtest.TestCase) {
-		id++
-		tc.ID = id
-		tc.Name = prefix + genName(tc)
-		if len(tc.Name) > 45 {
-			tc.Name = tc.Name[:45]
-		}
-		cases = append(cases, tc)
-	}
-
-	elite := minInt(20, len(sorted))
-	for i := 0; i < elite; i++ {
-		add("E:", sorted[i].TestCase)
-	}
-
-	mutParentPool := minInt(30, len(sorted))
-	if staleCount >= 5 {
-		mutParentPool = minInt(50, len(sorted))
-	}
-
-	for len(cases) < elite+120 {
-		pi := rng.Intn(mutParentPool)
-		child := mutate(sorted[pi].TestCase, rng, staleCount)
-		child = ensureValid(child)
-		add("M:", child)
-	}
-
-	crossPool := minInt(20, len(sorted))
-	for len(cases) < elite+120+40 && len(sorted) >= 2 {
-		p1 := sorted[rng.Intn(crossPool)].TestCase
-		p2 := sorted[rng.Intn(crossPool)].TestCase
-		child := crossover(p1, p2, rng)
-		child = ensureValid(child)
-		add("X:", child)
-	}
-
-	for len(cases) < casesPerIter {
-		child := randomCase(rng)
-		child = ensureValid(child)
-		add("R:", child)
-	}
-
-	bestTc := sorted[0].TestCase
-	fmt.Printf("  精英保留: %d | 变异(源自top%d): %d | 交叉: %d | 随机: %d\n",
-		elite, mutParentPool, 120, 40, casesPerIter-elite-120-40)
-	fmt.Printf("  当前最优种子: %s (Boll P%d M%.1f",
-		sorted[0].TestCase.Name, bestTc.BollPeriod, bestTc.BollMultiplier)
-	if bestTc.UseBreakout {
-		fmt.Printf(" + Break P%d", bestTc.BreakoutPeriod)
-	}
-	if bestTc.UseRSI {
-		fmt.Printf(" + RSI P%d", bestTc.RSIPeriod)
-	}
-	fmt.Println(")")
-
-	return cases
-}
-
-func mutate(p batchtest.TestCase, rng *rand.Rand, staleCount int) batchtest.TestCase {
-	c := p
-
-	scale := 1.0
-	if staleCount >= 5 {
-		scale = 1.5
-	} else if staleCount >= 10 {
-		scale = 2.0
-	}
-
-	if c.UseBoll {
-		if rng.Float64() < 0.4 {
-			c.BollPeriod += int(float64(rng.Intn(5)-2) * scale)
-		}
-		if rng.Float64() < 0.4 {
-			c.BollMultiplier += (rng.Float64() - 0.5) * 0.4 * scale
-		}
-		if rng.Float64() < 0.2 {
-			c.BollWeight *= 0.8 + rng.Float64()*0.4
-		}
-	}
-
-	if c.UseBreakout {
-		if rng.Float64() < 0.4 {
-			c.BreakoutPeriod += int(float64(rng.Intn(7)-3) * scale)
-		}
-		if rng.Float64() < 0.2 {
-			c.BreakoutWeight *= 0.8 + rng.Float64()*0.4
-		}
-	}
-
-	if c.UseRSI {
-		if rng.Float64() < 0.4 {
-			c.RSIPeriod += int(float64(rng.Intn(5)-2) * scale)
-		}
-		if rng.Float64() < 0.25 {
-			c.RSIOverbought += (rng.Float64() - 0.5) * 6 * scale
-			c.RSIOversold += (rng.Float64() - 0.5) * 6 * scale
-		}
-		if rng.Float64() < 0.2 {
-			c.RSIWeight *= 0.8 + rng.Float64()*0.4
-		}
-	}
-
-	if c.UseATR && rng.Float64() < 0.3 {
-		c.ATRPeriod += int(float64(rng.Intn(5)-2) * scale)
-	}
-	if c.UseVolume && rng.Float64() < 0.3 {
-		c.VolumePeriod += int(float64(rng.Intn(7)-3) * scale)
-	}
-	if c.UseMACD && rng.Float64() < 0.25 {
-		c.MACDFast += rng.Intn(3) - 1
-		c.MACDSlow += rng.Intn(5) - 2
-	}
-
-	toggleProb := 0.08
-	if staleCount >= 5 {
-		toggleProb = 0.15
-	}
-	if rng.Float64() < toggleProb {
-		switch rng.Intn(7) {
-		case 0:
-			c.UseATR = !c.UseATR
-			if c.UseATR {
-				c.ATRPeriod = 7 + rng.Intn(8)
-				c.ATRWeight = -1
-			}
-		case 1:
-			c.UseVolume = !c.UseVolume
-			if c.UseVolume {
-				c.VolumePeriod = 10 + rng.Intn(15)
-				c.VolumeWeight = -1
-			}
-		case 2:
-			if !c.UseRSI {
-				c.UseRSI = true
-				c.RSIPeriod = 7
-				c.RSIOverbought = 75
-				c.RSIOversold = 25
-				c.RSIWeight = 1
-			}
-		case 3:
-			if !c.UseBoll {
-				c.UseBoll = true
-				c.BollPeriod = 15
-				c.BollMultiplier = 2.0
-				c.BollWeight = 1
-			}
-		case 4:
-			if !c.UseBreakout {
-				c.UseBreakout = true
-				c.BreakoutPeriod = 10
-				c.BreakoutWeight = -1
-			}
-		case 5:
-			c.UseSession = !c.UseSession
-			if c.UseSession {
-				c.SessionWeight = -1
-			}
-		case 6:
-			c.UseMACross = !c.UseMACross
-			if c.UseMACross {
-				c.MACrossShort = 5
-				c.MACrossLong = 20
-				c.MACrossWeight = 1
-			}
-		}
-	}
-
-	return c
-}
-
-func crossover(p1, p2 batchtest.TestCase, rng *rand.Rand) batchtest.TestCase {
-	c := p1
-	if rng.Float64() < 0.5 {
-		c.UseBoll = p2.UseBoll
-		c.BollPeriod = p2.BollPeriod
-		c.BollMultiplier = p2.BollMultiplier
-		c.BollWeight = p2.BollWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseBreakout = p2.UseBreakout
-		c.BreakoutPeriod = p2.BreakoutPeriod
-		c.BreakoutWeight = p2.BreakoutWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseRSI = p2.UseRSI
-		c.RSIPeriod = p2.RSIPeriod
-		c.RSIOverbought = p2.RSIOverbought
-		c.RSIOversold = p2.RSIOversold
-		c.RSIWeight = p2.RSIWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseATR = p2.UseATR
-		c.ATRPeriod = p2.ATRPeriod
-		c.ATRWeight = p2.ATRWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseVolume = p2.UseVolume
-		c.VolumePeriod = p2.VolumePeriod
-		c.VolumeWeight = p2.VolumeWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseMA = p2.UseMA
-		c.MaShort = p2.MaShort
-		c.MaLong = p2.MaLong
-		c.MaWeight = p2.MaWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseTrend = p2.UseTrend
-		c.TrendN = p2.TrendN
-		c.TrendWeight = p2.TrendWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseMACD = p2.UseMACD
-		c.MACDFast = p2.MACDFast
-		c.MACDSlow = p2.MACDSlow
-		c.MACDSignal = p2.MACDSignal
-		c.MACDWeight = p2.MACDWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseSession = p2.UseSession
-		c.SessionWeight = p2.SessionWeight
-	}
-	if rng.Float64() < 0.5 {
-		c.UseMACross = p2.UseMACross
-		c.MACrossShort = p2.MACrossShort
-		c.MACrossLong = p2.MACrossLong
-		c.MACrossWeight = p2.MACrossWeight
-		c.MACrossWindow = p2.MACrossWindow
-		c.MACrossPreempt = p2.MACrossPreempt
-	}
-	return c
-}
-
-func randomCase(rng *rand.Rand) batchtest.TestCase {
-	c := batchtest.TestCase{}
-	if rng.Float64() < 0.8 {
-		c.UseBoll = true
-		c.BollPeriod = 5 + rng.Intn(25)
-		c.BollMultiplier = roundTo1(0.8 + rng.Float64()*2.2)
-		c.BollWeight = roundTo1(0.5 + rng.Float64()*3)
-	}
-	if rng.Float64() < 0.65 {
-		c.UseBreakout = true
-		c.BreakoutPeriod = 3 + rng.Intn(28)
-		c.BreakoutWeight = roundTo1(-0.5 - rng.Float64()*3)
-	}
-	if rng.Float64() < 0.4 {
-		c.UseRSI = true
-		c.RSIPeriod = 5 + rng.Intn(12)
-		c.RSIOverbought = 65 + float64(rng.Intn(16))
-		c.RSIOversold = 15 + float64(rng.Intn(16))
-		c.RSIWeight = roundTo1(0.5 + rng.Float64()*3)
-	}
-	if rng.Float64() < 0.15 {
-		c.UseATR = true
-		c.ATRPeriod = 5 + rng.Intn(16)
-		c.ATRWeight = roundTo1(-0.5 - rng.Float64()*2)
-	}
-	if rng.Float64() < 0.1 {
-		c.UseVolume = true
-		c.VolumePeriod = 5 + rng.Intn(26)
-		c.VolumeWeight = roundTo1(-0.5 - rng.Float64()*2)
-	}
-	if !c.UseBoll && !c.UseBreakout && !c.UseRSI {
-		c.UseBoll = true
-		c.BollPeriod = 10 + rng.Intn(10)
-		c.BollMultiplier = roundTo1(1.5 + rng.Float64())
-		c.BollWeight = 1
-	}
-	return c
-}
-
-func genName(tc batchtest.TestCase) string {
-	var p []string
-	if tc.UseBoll {
-		p = append(p, fmt.Sprintf("Bo%dM%.1f", tc.BollPeriod, tc.BollMultiplier))
-	}
-	if tc.UseBreakout {
-		p = append(p, fmt.Sprintf("Br%d", tc.BreakoutPeriod))
-	}
-	if tc.UseRSI {
-		p = append(p, fmt.Sprintf("R%d", tc.RSIPeriod))
-	}
-	if tc.UseATR {
-		p = append(p, fmt.Sprintf("A%d", tc.ATRPeriod))
-	}
-	if tc.UseVolume {
-		p = append(p, fmt.Sprintf("V%d", tc.VolumePeriod))
-	}
-	if tc.UseMACD {
-		p = append(p, "MACD")
-	}
-	if tc.UseMA {
-		p = append(p, "MA")
-	}
-	if tc.UseTrend {
-		p = append(p, fmt.Sprintf("Tr%d", tc.TrendN))
-	}
-	if tc.UsePriceVsMA {
-		p = append(p, "PvMA")
-	}
-	if tc.UseSession {
-		p = append(p, "Sess")
-	}
-	if tc.UseMACross {
-		p = append(p, fmt.Sprintf("MACr%d_%d", tc.MACrossShort, tc.MACrossLong))
-	}
-	if len(p) == 0 {
-		return "Empty"
-	}
-	return strings.Join(p, "+")
-}
-
-func ensureValid(tc batchtest.TestCase) batchtest.TestCase {
-	if tc.UseBoll {
-		tc.BollPeriod = clampInt(tc.BollPeriod, 3, 50)
-		tc.BollMultiplier = roundTo1(clampFloat(tc.BollMultiplier, 0.5, 3.5))
-		if tc.BollWeight == 0 {
-			tc.BollWeight = 1
-		}
-	}
-	if tc.UseBreakout {
-		tc.BreakoutPeriod = clampInt(tc.BreakoutPeriod, 2, 50)
-		if tc.BreakoutWeight == 0 {
-			tc.BreakoutWeight = -1
-		}
-	}
-	if tc.UseRSI {
-		tc.RSIPeriod = clampInt(tc.RSIPeriod, 3, 30)
-		tc.RSIOverbought = math.Round(clampFloat(tc.RSIOverbought, 55, 85))
-		tc.RSIOversold = math.Round(clampFloat(tc.RSIOversold, 15, 45))
-		if tc.RSIOverbought <= tc.RSIOversold {
-			tc.RSIOverbought = 70
-			tc.RSIOversold = 30
-		}
-		if tc.RSIWeight == 0 {
-			tc.RSIWeight = 1
-		}
-	}
-	if tc.UseATR {
-		tc.ATRPeriod = clampInt(tc.ATRPeriod, 3, 30)
-		if tc.ATRWeight == 0 {
-			tc.ATRWeight = -1
-		}
-	}
-	if tc.UseVolume {
-		tc.VolumePeriod = clampInt(tc.VolumePeriod, 3, 40)
-		if tc.VolumeWeight == 0 {
-			tc.VolumeWeight = -1
-		}
-	}
-	if tc.UseMACD {
-		tc.MACDFast = clampInt(tc.MACDFast, 5, 20)
-		tc.MACDSlow = clampInt(tc.MACDSlow, 15, 40)
-		tc.MACDSignal = clampInt(tc.MACDSignal, 5, 15)
-		if tc.MACDWeight == 0 {
-			tc.MACDWeight = 1
-		}
-	}
-	if tc.UseMA {
-		tc.MaShort = clampInt(tc.MaShort, 3, 20)
-		tc.MaLong = clampInt(tc.MaLong, 10, 60)
-		if tc.MaLong <= tc.MaShort {
-			tc.MaLong = tc.MaShort + 10
-		}
-		if tc.MaWeight == 0 {
-			tc.MaWeight = 1
-		}
-	}
-	if tc.UseMACross {
-		tc.MACrossShort = clampInt(tc.MACrossShort, 2, 30)
-		tc.MACrossLong = clampInt(tc.MACrossLong, 5, 250)
-		if tc.MACrossLong <= tc.MACrossShort {
-			tc.MACrossLong = tc.MACrossShort + 5
-		}
-		tc.MACrossWindow = clampInt(tc.MACrossWindow, 0, 5)
-		tc.MACrossPreempt = clampFloat(tc.MACrossPreempt, 0, 0.01)
-		if tc.MACrossWeight == 0 {
-			tc.MACrossWeight = 1
-		}
-	}
-	return tc
-}
-
 // ======================== ANALYSIS ========================
 
 type analyzed struct {
 	total     int
-	top10     []batchtest.TestResult
+	top10     []cases.TestResult
 	top10Avg  float64
 	avgSigAcc float64
 	maxSigAcc float64
 	minSigAcc float64
 }
 
-func analyzeResults(results []batchtest.TestResult) analyzed {
+func analyzeResults(results []cases.TestResult) analyzed {
 	a := analyzed{total: len(results)}
 	if len(results) == 0 {
 		return a
 	}
 
-	sorted := make([]batchtest.TestResult, len(results))
+	sorted := make([]cases.TestResult, len(results))
 	copy(sorted, results)
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i].SignalAccuracy > sorted[j].SignalAccuracy
@@ -643,7 +190,76 @@ func analyzeResults(results []batchtest.TestResult) analyzed {
 	return a
 }
 
-func writeAnalysisLog(path string, iter int, excelFile string, a analyzed, elapsed time.Duration) {
+func strategyGroup(tc cases.TestCase) string {
+	var parts []string
+	if tc.UseBoll {
+		parts = append(parts, "Bo")
+	}
+	if tc.UseRSI {
+		parts = append(parts, "R")
+	}
+	if tc.UseBreakout {
+		parts = append(parts, "Br")
+	}
+	if tc.UseATR {
+		parts = append(parts, "A")
+	}
+	if tc.UseMA {
+		parts = append(parts, "M")
+	}
+	if tc.UseTrend {
+		parts = append(parts, "T")
+	}
+	if tc.UsePriceVsMA {
+		parts = append(parts, "Pv")
+	}
+	if tc.UseVolume {
+		parts = append(parts, "V")
+	}
+	if tc.UseMACD {
+		parts = append(parts, "Macd")
+	}
+	if tc.UseMACross {
+		parts = append(parts, "Mc")
+	}
+	if tc.UseSession {
+		parts = append(parts, "Sess")
+	}
+	if len(parts) == 0 {
+		return "other"
+	}
+	return strings.Join(parts, "+")
+}
+
+func printPerGroupBest(results []cases.TestResult) {
+	groupBest := make(map[string]cases.TestResult)
+	for _, r := range results {
+		g := strategyGroup(r.TestCase)
+		prev, ok := groupBest[g]
+		if !ok || r.SignalAccuracy > prev.SignalAccuracy {
+			groupBest[g] = r
+		}
+	}
+	// sort groups by name for stable output
+	var keys []string
+	for k := range groupBest {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	fmt.Println("[分析] 各策略组最优:")
+	for _, g := range keys {
+		r := groupBest[g]
+		rate := 0.0
+		if r.Total > 0 {
+			rate = float64(r.SignalCount) / float64(r.Total) * 100
+		}
+		fmt.Printf("    %-18s %-42s %.2f%% (信号率%.1f%%)\n",
+			g, r.TestCase.Name, r.SignalAccuracy*100, rate)
+	}
+}
+
+func writeAnalysisLog(path string, iter int, excelFile string, a analyzed, elapsed time.Duration, results []cases.TestResult) {
 	f, err := os.Create(path)
 	if err != nil {
 		return
@@ -668,6 +284,79 @@ func writeAnalysisLog(path string, iter int, excelFile string, a analyzed, elaps
 		w("%2d. #%-3d %-40s Acc=%.2f%% Rate=%.1f%% Str=%.3f Avg=%+.3f",
 			i+1, r.TestCase.ID, r.TestCase.Name, r.SignalAccuracy*100, rate, r.AvgAbsScore, r.AvgScore)
 	}
+
+	// 各组最优
+	groupBest := make(map[string]cases.TestResult)
+	for _, r := range results {
+		g := strategyGroup(r.TestCase)
+		prev, ok := groupBest[g]
+		if !ok || r.SignalAccuracy > prev.SignalAccuracy {
+			groupBest[g] = r
+		}
+	}
+	var keys []string
+	for k := range groupBest {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	w("")
+	w("=== 各组策略最优参数 ===")
+	for _, g := range keys {
+		r := groupBest[g]
+		rate := 0.0
+		if r.Total > 0 {
+			rate = float64(r.SignalCount) / float64(r.Total) * 100
+		}
+		w("%-18s %-42s Acc=%.2f%% Rate=%.1f%% | %s", g, r.TestCase.Name, r.SignalAccuracy*100, rate, formatTestCaseParams(r.TestCase))
+	}
+}
+
+func formatTestCaseParams(tc cases.TestCase) string {
+	var parts []string
+	if tc.UseBoll {
+		parts = append(parts, fmt.Sprintf("Bo P%d M%.1f w%.1f", tc.BollPeriod, tc.BollMultiplier, tc.BollWeight))
+	}
+	if tc.UseRSI {
+		parts = append(parts, fmt.Sprintf("RSI P%d %.0f/%.0f w%.1f", tc.RSIPeriod, tc.RSIOverbought, tc.RSIOversold, tc.RSIWeight))
+	}
+	if tc.UseBreakout {
+		parts = append(parts, fmt.Sprintf("Br P%d w%.1f", tc.BreakoutPeriod, tc.BreakoutWeight))
+	}
+	if tc.UseATR {
+		parts = append(parts, fmt.Sprintf("ATR P%d w%.1f", tc.ATRPeriod, tc.ATRWeight))
+	}
+	if tc.UseMA {
+		parts = append(parts, fmt.Sprintf("MA %d/%d w%.1f", tc.MaShort, tc.MaLong, tc.MaWeight))
+	}
+	if tc.UseTrend {
+		parts = append(parts, fmt.Sprintf("T N%d w%.1f", tc.TrendN, tc.TrendWeight))
+	}
+	if tc.UsePriceVsMA {
+		parts = append(parts, fmt.Sprintf("Pv P%d w%.1f", tc.PriceVsMAPeriod, tc.PriceVsMAWeight))
+	}
+	if tc.UseVolume {
+		parts = append(parts, fmt.Sprintf("V P%d w%.1f", tc.VolumePeriod, tc.VolumeWeight))
+	}
+	if tc.UseMACD {
+		parts = append(parts, fmt.Sprintf("Macd %d/%d/%d w%.1f", tc.MACDFast, tc.MACDSlow, tc.MACDSignal, tc.MACDWeight))
+	}
+	if tc.UseMACross {
+		parts = append(parts, fmt.Sprintf("Mc %d/%d w%.1f", tc.MACrossShort, tc.MACrossLong, tc.MACrossWeight))
+	}
+	if tc.UseSession {
+		parts = append(parts, fmt.Sprintf("Sess w%.1f", tc.SessionWeight))
+	}
+	if len(parts) == 0 {
+		return "-"
+	}
+	s := ""
+	for i, p := range parts {
+		if i > 0 {
+			s += " "
+		}
+		s += p
+	}
+	return s
 }
 
 func printTrend(summaries []iterSummary, globalBestAcc float64, globalBestName string) {
@@ -724,37 +413,4 @@ func writeTrendFile(path string, summaries []iterSummary, globalBestAcc float64,
 			delta*100, first.bestAcc*100, last.iter, last.bestAcc*100)
 	}
 	w("全局最佳: %.2f%% (%s)", globalBestAcc*100, globalBestName)
-}
-
-// ======================== HELPERS ========================
-
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
-
-func clampFloat(v, lo, hi float64) float64 {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
-
-func roundTo1(v float64) float64 {
-	return math.Round(v*10) / 10
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

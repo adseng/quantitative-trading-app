@@ -1,0 +1,18 @@
+Iteration: 1
+Time: 2026-03-05 14:08:59
+Excel: batch_test_log_20260305140859.xlsx
+Duration: 357ms
+Cases: 20
+Signal Accuracy: best=52.54% top10avg=52.11% avg=49.96% worst=47.38%
+
+=== TOP 10 ===
+ 1. #8   Trend_N8_w-1                             Acc=52.54% Rate=69.8% Str=1.000 Avg=-0.013
+ 2. #12  Trend_N12_w-1                            Acc=52.43% Rate=74.8% Str=1.000 Avg=-0.016
+ 3. #2   Trend_N3_w-1                             Acc=52.40% Rate=99.9% Str=1.000 Avg=-0.005
+ 4. #10  Trend_N10_w-1                            Acc=52.35% Rate=72.7% Str=1.000 Avg=-0.014
+ 5. #4   Trend_N5_w-1                             Acc=52.18% Rate=99.8% Str=1.000 Avg=-0.007
+ 6. #6   Trend_N7_w-1                             Acc=52.13% Rate=99.8% Str=1.000 Avg=-0.009
+ 7. #16  Trend_N18_w-1                            Acc=51.92% Rate=78.9% Str=1.000 Avg=-0.017
+ 8. #18  Trend_N20_w-1                            Acc=51.86% Rate=79.8% Str=1.000 Avg=-0.016
+ 9. #14  Trend_N15_w-1                            Acc=51.83% Rate=99.7% Str=1.000 Avg=-0.011
+10. #20  Trend_N25_w-1                            Acc=51.51% Rate=99.6% Str=1.000 Avg=-0.018

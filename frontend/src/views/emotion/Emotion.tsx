@@ -31,18 +31,19 @@ export default function FactorAnalysis() {
   const [interval, setInterval] = useState('15m')
   const [limit, setLimit] = useState(100)
 
-  const [useMA, setUseMA] = useState(true)
+  // V4 最优: 单因子 Boll P13 M2.4 ~59.71%; 双因子 Bo10M20+Br15; 三因子 R7_75+Bo10M20+Br10
+  const [useMA, setUseMA] = useState(false)
   const [maShort, setMaShort] = useState(5)
   const [maLong, setMaLong] = useState(20)
   const [maWeight, setMaWeight] = useState(1)
 
-  const [useTrend, setUseTrend] = useState(true)
+  const [useTrend, setUseTrend] = useState(false)
   const [trendN, setTrendN] = useState(10)
   const [trendWeight, setTrendWeight] = useState(1)
 
   const [useRSI, setUseRSI] = useState(false)
-  const [rsiPeriod, setRsiPeriod] = useState(14)
-  const [rsiOverbought, setRsiOverbought] = useState(70)
+  const [rsiPeriod, setRsiPeriod] = useState(7)
+  const [rsiOverbought, setRsiOverbought] = useState(75)
   const [rsiOversold, setRsiOversold] = useState(30)
   const [rsiWeight, setRsiWeight] = useState(1)
 
@@ -52,29 +53,29 @@ export default function FactorAnalysis() {
   const [macdSignal, setMacdSignal] = useState(9)
   const [macdWeight, setMacdWeight] = useState(1)
 
-  const [useBoll, setUseBoll] = useState(false)
-  const [bollPeriod, setBollPeriod] = useState(20)
-  const [bollMultiplier, setBollMultiplier] = useState(2.0)
+  const [useBoll, setUseBoll] = useState(true)
+  const [bollPeriod, setBollPeriod] = useState(13)
+  const [bollMultiplier, setBollMultiplier] = useState(2.4)
   const [bollWeight, setBollWeight] = useState(1)
 
   const [useBreakout, setUseBreakout] = useState(false)
-  const [breakoutPeriod, setBreakoutPeriod] = useState(20)
-  const [breakoutWeight, setBreakoutWeight] = useState(1)
+  const [breakoutPeriod, setBreakoutPeriod] = useState(15)
+  const [breakoutWeight, setBreakoutWeight] = useState(-1)
 
   const [usePriceVsMA, setUsePriceVsMA] = useState(false)
   const [priceVsMAPeriod, setPriceVsMAPeriod] = useState(20)
-  const [priceVsMAWeight, setPriceVsMAWeight] = useState(1)
+  const [priceVsMAWeight, setPriceVsMAWeight] = useState(-1)
 
   const [useATR, setUseATR] = useState(false)
   const [atrPeriod, setAtrPeriod] = useState(14)
-  const [atrWeight, setAtrWeight] = useState(1)
+  const [atrWeight, setAtrWeight] = useState(-1)
 
   const [useVolume, setUseVolume] = useState(false)
   const [volumePeriod, setVolumePeriod] = useState(20)
-  const [volumeWeight, setVolumeWeight] = useState(1)
+  const [volumeWeight, setVolumeWeight] = useState(-1)
 
   const [useSession, setUseSession] = useState(false)
-  const [sessionWeight, setSessionWeight] = useState(1)
+  const [sessionWeight, setSessionWeight] = useState(-1)
 
   const [useMACross, setUseMACross] = useState(false)
   const [macrossShort, setMacrossShort] = useState(5)
@@ -97,7 +98,10 @@ export default function FactorAnalysis() {
         setKlines(list)
         message.success(`已获取 ${list.length} 根 K 线`)
       })
-      .catch((err) => message.error(err?.message || '获取 K 线失败'))
+      .catch((err) => {
+        const msg = err?.message || err?.Message || (typeof err === 'string' ? err : '获取 K 线失败')
+        message.error(msg)
+      })
       .finally(() => setFetching(false))
   }
 
@@ -250,7 +254,7 @@ export default function FactorAnalysis() {
 
   const W = ({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled: boolean }) => (
     <>
-      <InputNumber value={value} onChange={(v) => onChange(v ?? 0)} min={0} step={0.1} disabled={disabled} style={{ width: 64 }} />
+      <InputNumber value={value} onChange={(v) => onChange(v ?? 0)} min={-5} max={5} step={0.1} disabled={disabled} style={{ width: 64 }} />
       <span className="text-xs text-gray-500">权重</span>
     </>
   )
@@ -371,10 +375,17 @@ export default function FactorAnalysis() {
           </div>
           {backtestResult && (
             <div>
-              <div className="mb-2 text-lg">
-                正确率:{' '}
-                <span className="font-medium text-blue-600">{((backtestResult.accuracy ?? 0) * 100).toFixed(1)}%</span>
-                {' '}({backtestResult.correct}/{backtestResult.total})
+              <div className="mb-2 text-lg space-x-4">
+                <span>
+                  信号正确率:{' '}
+                  <span className="font-medium text-blue-600">
+                    {((backtestResult.signalAccuracy ?? 0) * 100).toFixed(1)}%
+                  </span>
+                  {' '}({backtestResult.correct}/{backtestResult.signalCount ?? 0} 有效预测，共 {backtestResult.total} 条)
+                </span>
+                <span className="text-gray-500 text-sm">
+                  总条数 {backtestResult.total} · 与批量回测口径一致
+                </span>
               </div>
               <Table
                 dataSource={backtestResult.results}

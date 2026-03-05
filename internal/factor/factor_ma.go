@@ -1,11 +1,12 @@
 package factor
 
-// FactorMA 均线因子：短期均线 vs 长期均线（多空排列）。
-// 短期 > 长期 → 信号 1 → 影响力 +weight；短期 < 长期 → 信号 -1 → 影响力 -weight；相等 → 0。
+// FactorMA 均线因子：短期均线 vs 长期均线。
+// 基于回测结论：短期 < 长期（均线下压）时，下一根K线更易上涨，故输出正向看涨信号。
+// 短期 > 长期 → 看跌；短期 < 长期 → 看涨；相等 → 0。
 //
 // 参数：
-//   - shortPeriod, longPeriod: 短期、长期均线周期（如 5, 20）
-//   - weight: 该因子权重
+//   - shortPeriod, longPeriod: 短期、长期均线周期（如 1, 7）
+//   - weight: 该因子权重（多因子组合时用于调节贡献度）
 func (e *SignalContext) FactorMA(shortPeriod, longPeriod int, weight float64) *SignalContext {
 	if e.KLine == nil || len(e.KLine.History) < longPeriod {
 		return e
@@ -18,10 +19,9 @@ func (e *SignalContext) FactorMA(shortPeriod, longPeriod int, weight float64) *S
 	shortMA := avg(prices[:shortPeriod])
 	longMA := avg(prices[:longPeriod])
 
-	// 多头排列：短期在长期之上
-	if shortMA > longMA {
+	if shortMA < longMA {
 		e.AddBull(weight)
-	} else if shortMA < longMA {
+	} else if shortMA > longMA {
 		e.AddBear(weight)
 	}
 	return e

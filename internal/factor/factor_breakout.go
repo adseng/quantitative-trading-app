@@ -1,7 +1,8 @@
 package factor
 
-// FactorBreakout 高低点突破因子：价格突破近 N 根 K 线最高价 → 看涨；跌破最低价 → 看跌。
-// period: 回看周期（常用20），weight: 权重。
+// FactorBreakout 高低点突破因子。
+// 回测结论：跌破最低价时下一根更易上涨，故输出正向看涨信号。
+// 突破最高价 → 看跌；跌破最低价 → 看涨。
 func (e *SignalContext) FactorBreakout(period int, weight float64) *SignalContext {
 	if e.KLine == nil || len(e.KLine.History) < period+1 {
 		return e
@@ -20,9 +21,9 @@ func (e *SignalContext) FactorBreakout(period int, weight float64) *SignalContex
 		}
 	}
 
-	if currentClose > highest {
+	if currentClose < lowest {
 		e.AddBull(weight)
-	} else if currentClose < lowest {
+	} else if currentClose > highest {
 		e.AddBear(weight)
 	}
 	return e

@@ -1,0 +1,18 @@
+Iteration: 5
+Time: 2026-03-05 13:30:45
+Excel: batch_test_log_20260305133037.xlsx
+Duration: 8.009s
+Cases: 200
+Signal Accuracy: best=52.03% top10avg=52.03% avg=51.75% worst=48.23%
+
+=== TOP 10 ===
+ 1. #124 M:MA                                     Acc=52.03% Rate=100.0% Str=0.993 Avg=-0.031
+ 2. #111 M:MA                                     Acc=52.03% Rate=100.0% Str=1.000 Avg=-0.031
+ 3. #3   E:MA                                     Acc=52.03% Rate=100.0% Str=1.000 Avg=-0.031
+ 4. #4   E:MA                                     Acc=52.03% Rate=100.0% Str=1.000 Avg=-0.031
+ 5. #126 M:MA                                     Acc=52.03% Rate=100.0% Str=0.896 Avg=-0.028
+ 6. #6   E:MA                                     Acc=52.03% Rate=100.0% Str=1.000 Avg=-0.031
+ 7. #59  M:MA                                     Acc=52.03% Rate=100.0% Str=1.000 Avg=-0.031
+ 8. #58  M:MA                                     Acc=52.03% Rate=100.0% Str=1.000 Avg=-0.031
+ 9. #74  M:MA                                     Acc=52.03% Rate=100.0% Str=1.000 Avg=-0.031
+10. #177 X:MA                                     Acc=52.03% Rate=100.0% Str=1.000 Avg=-0.031

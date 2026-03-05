@@ -1,0 +1,18 @@
+Iteration: 1
+Time: 2026-03-05 14:09:54
+Excel: batch_test_log_20260305140953.xlsx
+Duration: 1.403s
+Cases: 60
+Signal Accuracy: best=58.63% top10avg=57.80% avg=49.97% worst=41.35%
+
+=== TOP 10 ===
+ 1. #19  Boll_P10_M2.0_w1                         Acc=58.63% Rate=8.9% Str=1.000 Avg=+0.000
+ 2. #29  Boll_P12_M2.0_w1                         Acc=58.46% Rate=10.0% Str=1.000 Avg=+0.004
+ 3. #39  Boll_P15_M2.0_w1                         Acc=58.13% Rate=10.9% Str=1.000 Avg=+0.000
+ 4. #9   Boll_P8_M2.0_w1                          Acc=58.10% Rate=7.2% Str=1.000 Avg=+0.006
+ 5. #7   Boll_P8_M1.8_w1                          Acc=57.72% Rate=12.9% Str=1.000 Avg=+0.002
+ 6. #17  Boll_P10_M1.8_w1                         Acc=57.64% Rate=14.4% Str=1.000 Avg=+0.002
+ 7. #27  Boll_P12_M1.8_w1                         Acc=57.62% Rate=15.2% Str=1.000 Avg=-0.003
+ 8. #49  Boll_P18_M2.0_w1                         Acc=57.36% Rate=11.5% Str=1.000 Avg=-0.003
+ 9. #37  Boll_P15_M1.8_w1                         Acc=57.35% Rate=16.1% Str=1.000 Avg=-0.009
+10. #59  Boll_P20_M2.0_w1                         Acc=56.99% Rate=12.0% Str=1.000 Avg=-0.008

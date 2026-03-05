@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"quantitative-trading-app/internal/batchtest/cases"
 	"quantitative-trading-app/internal/factor"
 
 	"github.com/xuri/excelize/v2"
@@ -20,8 +22,8 @@ type BatchRunner struct {
 	running     bool
 	cancelCh    chan struct{}
 	nextIdx     int // 下一个要运行的 case 索引（用于 resume）
-	cases       []TestCase
-	results     []TestResult
+	testCases   []cases.TestCase
+	results     []cases.TestResult
 	completedIDs map[int]bool // 从 Excel 读取的已完成 ID 集合
 	excelFile   string        // 当前批次的 Excel 文件名（含时间戳）
 }
@@ -29,7 +31,7 @@ type BatchRunner struct {
 // NewBatchRunner 创建批量运行器，自动从最新 Excel 恢复进度。
 func NewBatchRunner() *BatchRunner {
 	r := &BatchRunner{
-		cases: GenerateTestCases(),
+		testCases: cases.GenerateTestCases(),
 	}
 	r.findOrCreateExcelFile()
 	r.loadProgressFromExcel()
@@ -37,9 +39,9 @@ func NewBatchRunner() *BatchRunner {
 }
 
 // NewBatchRunnerWithCases 创建使用自定义用例的运行器（不恢复进度，新建 Excel）。
-func NewBatchRunnerWithCases(cases []TestCase) *BatchRunner {
+func NewBatchRunnerWithCases(testCases []cases.TestCase) *BatchRunner {
 	return &BatchRunner{
-		cases:     cases,
+		testCases: testCases,
 		excelFile: "batch_test_log_" + time.Now().Format("20060102150405") + ".xlsx",
 	}
 }
@@ -96,7 +98,7 @@ func (r *BatchRunner) ResetForNewBatch() {
 	r.nextIdx = 0
 	r.results = nil
 	r.completedIDs = nil
-	r.cases = GenerateTestCases()
+	r.testCases = cases.GenerateTestCases()
 }
 
 // loadProgressFromExcel 读取当前 Excel 文件，收集已完成的用例 ID，
@@ -130,15 +132,15 @@ func (r *BatchRunner) loadProgressFromExcel() {
 		r.completedIDs[id] = true
 	}
 
-	// 从头扫描 cases，找到第一个未完成的索引
-	for idx, tc := range r.cases {
+	// 从头扫描 testCases，找到第一个未完成的索引
+	for idx, tc := range r.testCases {
 		if !r.completedIDs[tc.ID] {
 			r.nextIdx = idx
 			return
 		}
 	}
 	// 全部已完成
-	r.nextIdx = len(r.cases)
+	r.nextIdx = len(r.testCases)
 }
 
 // IsRunning 是否正在运行。
@@ -157,14 +159,95 @@ func (r *BatchRunner) NextIndex() int {
 
 // TotalCases 总用例数。
 func (r *BatchRunner) TotalCases() int {
-	return len(r.cases)
+	return len(r.testCases)
 }
 
 // Results 返回已完成的测试结果。
-func (r *BatchRunner) Results() []TestResult {
+func (r *BatchRunner) Results() []cases.TestResult {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.results
+}
+
+// GetLastResults 返回最近的结果：若内存中有则直接返回，否则从当前 Excel 加载（用于页面初始化展示）。
+func (r *BatchRunner) GetLastResults(maxN int) []cases.TestResult {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.results) > 0 {
+		return recentN(r.results, maxN)
+	}
+	loaded := r.loadResultsFromExcel(maxN)
+	return loaded
+}
+
+// loadResultsFromExcel 从当前 Excel 文件加载最近 maxN 条结果（不加锁，调用方需持有锁）。
+func (r *BatchRunner) loadResultsFromExcel(maxN int) []cases.TestResult {
+	path := filepath.Join(excelDir(), r.excelFile)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+	f, err := excelize.OpenFile(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	rows, err := f.GetRows(batchSheetName)
+	if err != nil || len(rows) <= 1 {
+		return nil
+	}
+	idToCase := make(map[int]cases.TestCase)
+	for _, c := range r.testCases {
+		idToCase[c.ID] = c
+	}
+	var all []cases.TestResult
+	for i := 1; i < len(rows); i++ {
+		row := rows[i]
+		if len(row) < 50 {
+			continue
+		}
+		id, _ := strconv.Atoi(row[0])
+		tc, ok := idToCase[id]
+		if !ok {
+			continue
+		}
+		acc, _ := parsePct(safeCol(row, 44))       // 信号正确率 "59.7%"
+		correct, _ := strconv.Atoi(safeCol(row, 45))   // 正确数
+		signalCount, _ := strconv.Atoi(safeCol(row, 46)) // 有效预测
+		total, _ := strconv.Atoi(safeCol(row, 47))     // 总数
+		avgScore, _ := strconv.ParseFloat(safeCol(row, 48), 64)   // 平均净分
+		avgAbsScore, _ := strconv.ParseFloat(safeCol(row, 49), 64) // 信号强度
+		accuracy := 0.0
+		if total > 0 {
+			accuracy = float64(correct) / float64(total)
+		}
+		all = append(all, cases.TestResult{
+			TestCase:       tc,
+			Accuracy:       accuracy,
+			Correct:        correct,
+			Total:          total,
+			SignalCount:    signalCount,
+			SignalAccuracy: acc,
+			AvgScore:       avgScore,
+			AvgAbsScore:    avgAbsScore,
+		})
+	}
+	return recentN(all, maxN)
+}
+
+func safeCol(row []string, idx int) string {
+	if idx < len(row) {
+		return strings.TrimSpace(row[idx])
+	}
+	return ""
+}
+
+func parsePct(s string) (float64, error) {
+	s = strings.TrimSuffix(strings.TrimSpace(s), "%")
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+	return f / 100, nil
 }
 
 // ExcelDir 返回 Excel 输出目录。
@@ -184,12 +267,12 @@ func (r *BatchRunner) Stop() {
 
 // ProgressEvent 进度事件数据。
 type ProgressEvent struct {
-	Phase      string      `json:"phase"`      // "fetching" | "testing" | "done" | "error"
-	Message    string      `json:"message"`
-	CaseIndex  int         `json:"caseIndex"`
-	TotalCases int         `json:"totalCases"`
-	Current    *TestResult `json:"current,omitempty"`
-	Recent     []TestResult `json:"recent,omitempty"` // 最近 200 条
+	Phase      string             `json:"phase"`      // "fetching" | "testing" | "done" | "error"
+	Message    string             `json:"message"`
+	CaseIndex  int                `json:"caseIndex"`
+	TotalCases int                `json:"totalCases"`
+	Current    *cases.TestResult  `json:"current,omitempty"`
+	Recent     []cases.TestResult `json:"recent,omitempty"` // 最近 200 条
 }
 
 // Run 开始或继续批量测试。
@@ -211,7 +294,7 @@ func (r *BatchRunner) Run(klines []*factor.KLine, onProgress func(ProgressEvent)
 	}()
 
 	cancelCh := r.cancelCh
-	total := len(r.cases)
+	total := len(r.testCases)
 
 	for r.nextIdx < total {
 		select {
@@ -221,7 +304,7 @@ func (r *BatchRunner) Run(klines []*factor.KLine, onProgress func(ProgressEvent)
 		default:
 		}
 
-		tc := r.cases[r.nextIdx]
+		tc := r.testCases[r.nextIdx]
 
 		cfg := &factor.FactorConfig{
 			UseMA: tc.UseMA, MaShort: tc.MaShort, MaLong: tc.MaLong, MaWeight: tc.MaWeight,
@@ -240,7 +323,7 @@ func (r *BatchRunner) Run(klines []*factor.KLine, onProgress func(ProgressEvent)
 
 		summary := factor.BacktestWithConfig(klines, cfg)
 
-		tr := TestResult{
+		tr := cases.TestResult{
 			TestCase:       tc,
 			Accuracy:       summary.Accuracy,
 			Correct:        summary.Correct,
@@ -268,7 +351,7 @@ func (r *BatchRunner) Run(klines []*factor.KLine, onProgress func(ProgressEvent)
 	onProgress(ProgressEvent{Phase: "done", Message: "全部完成", CaseIndex: total, TotalCases: total, Recent: recentN(r.results, 200)})
 }
 
-func recentN(results []TestResult, n int) []TestResult {
+func recentN(results []cases.TestResult, n int) []cases.TestResult {
 	if len(results) <= n {
 		return results
 	}
@@ -293,7 +376,7 @@ var batchHeaders = []string{
 	"信号正确率", "正确数", "有效预测", "总数", "平均净分", "信号强度", "标记",
 }
 
-func (r *BatchRunner) writeOneToExcel(tr TestResult) error {
+func (r *BatchRunner) writeOneToExcel(tr cases.TestResult) error {
 	path := filepath.Join(excelDir(), r.excelFile)
 
 	var f *excelize.File

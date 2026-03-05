@@ -26,14 +26,15 @@ func main() {
 	fmt.Println("Fetching BTCUSDT 15m klines: 100 rounds × 1000 per round ...")
 
 	cancel := make(chan struct{})
-	klines, err := binance.FetchKlinesChunked(
-		"BTCUSDT", "15m",
-		1000, 100, 600,
-		func(round, totalRounds, fetched int) {
+	klines, err := binance.FetchKlines("BTCUSDT", "15m", 0, &binance.FetchKlinesOpts{
+		PerReq:  1000,
+		Chunks:  100,
+		DelayMs: 600,
+		ProgressFn: func(round, totalRounds, fetched int) {
 			fmt.Printf("  round %d/%d, total fetched: %d\n", round, totalRounds, fetched)
 		},
-		cancel,
-	)
+		CancelCh: cancel,
+	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
 		os.Exit(1)

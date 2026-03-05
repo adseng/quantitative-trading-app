@@ -1,0 +1,21 @@
+Iteration: 1
+Time: 2026-03-05 15:46:19
+Excel: batch_test_log_20260305154608.xlsx
+Duration: 11.543s
+Cases: 192
+Signal Accuracy: best=52.79% top10avg=52.79% avg=52.69% worst=52.54%
+
+=== TOP 10 ===
+ 1. #89  R5+Bo13M2.2+Br15+Pv8_w0.25               Acc=52.79% Rate=100.0% Str=0.693 Avg=-0.020
+ 2. #67  R5+Bo13M2.0+Br15+Pv8_w0.75               Acc=52.79% Rate=100.0% Str=1.231 Avg=-0.032
+ 3. #91  R5+Bo13M2.2+Br15+Pv8_w0.75               Acc=52.79% Rate=100.0% Str=1.193 Avg=-0.032
+ 4. #18  R5+Bo12M2.0+Br15+Pv8_w0.50               Acc=52.79% Rate=100.0% Str=0.978 Avg=-0.027
+ 5. #17  R5+Bo12M2.0+Br15+Pv8_w0.25               Acc=52.79% Rate=100.0% Str=0.728 Avg=-0.021
+ 6. #65  R5+Bo13M2.0+Br15+Pv8_w0.25               Acc=52.79% Rate=100.0% Str=0.732 Avg=-0.021
+ 7. #66  R5+Bo13M2.0+Br15+Pv8_w0.50               Acc=52.79% Rate=100.0% Str=0.982 Avg=-0.026
+ 8. #41  R5+Bo12M2.2+Br15+Pv8_w0.25               Acc=52.79% Rate=100.0% Str=0.690 Avg=-0.021
+ 9. #90  R5+Bo13M2.2+Br15+Pv8_w0.50               Acc=52.79% Rate=100.0% Str=0.943 Avg=-0.026
+10. #42  R5+Bo12M2.2+Br15+Pv8_w0.50               Acc=52.79% Rate=100.0% Str=0.939 Avg=-0.026
+
+=== 各组策略最优参数 ===
+Bo+R+Br+Pv         R5+Bo12M2.0+Br15+Pv8_w0.25                 Acc=52.79% Rate=100.0% | Bo P12 M2.0 w1.0 RSI P5 80/20 w1.0 Br P15 w1.0 Pv P8 w0.2

@@ -1,7 +1,9 @@
 package factor
 
-// FactorMACD MACD因子：MACD线 > 信号线 → 看涨(信号1)；MACD线 < 信号线 → 看跌(信号-1)。
-// fast, slow, signalN: EMA周期（常用12, 26, 9），weight: 权重。
+// FactorMACD MACD因子。
+// 基于回测结论：MACD线 < 信号线时下一根更易上涨，故输出正向看涨信号。
+// MACD > 信号线 → 看跌；MACD < 信号线 → 看涨。
+// fast, slow, signalN: EMA周期（常用12, 26, 9），weight: 权重（多因子用）
 func (e *SignalContext) FactorMACD(fast, slow, signalN int, weight float64) *SignalContext {
 	if e.KLine == nil {
 		return e
@@ -49,9 +51,9 @@ func (e *SignalContext) FactorMACD(fast, slow, signalN int, weight float64) *Sig
 	lastMACD := macdLine[len(macdLine)-1]
 	lastSignal := signalLine[len(signalLine)-1]
 
-	if lastMACD > lastSignal {
+	if lastMACD < lastSignal {
 		e.AddBull(weight)
-	} else if lastMACD < lastSignal {
+	} else if lastMACD > lastSignal {
 		e.AddBear(weight)
 	}
 	return e

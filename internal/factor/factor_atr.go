@@ -39,9 +39,10 @@ func (e *SignalContext) FactorATR(period int, weight float64) *SignalContext {
 	}
 
 	priceChange := e.KLine.History[0].Close - e.KLine.History[1].Close
-	if priceChange > 0 {
+	// 回测结论：ATR放大+价格下跌时下一根更易上涨（超卖反弹）
+	if priceChange < 0 {
 		e.AddBull(weight)
-	} else if priceChange < 0 {
+	} else if priceChange > 0 {
 		e.AddBear(weight)
 	}
 	return e

@@ -1,0 +1,18 @@
+Iteration: 12
+Time: 2026-03-05 13:23:05
+Excel: batch_test_log_20260305132256.xlsx
+Duration: 8.408s
+Cases: 200
+Signal Accuracy: best=59.71% top10avg=59.71% avg=58.90% worst=52.51%
+
+=== TOP 10 ===
+ 1. #151 X:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=3.101 Avg=-0.017
+ 2. #149 X:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=2.879 Avg=-0.016
+ 3. #3   E:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=3.548 Avg=-0.019
+ 4. #4   E:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=3.548 Avg=-0.019
+ 5. #5   E:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=2.879 Avg=-0.016
+ 6. #6   E:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=3.548 Avg=-0.019
+ 7. #7   E:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=2.879 Avg=-0.016
+ 8. #99  M:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=4.012 Avg=-0.022
+ 9. #9   E:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=3.548 Avg=-0.019
+10. #10  E:Bo13M2.4                               Acc=59.71% Rate=3.8% Str=2.879 Avg=-0.016

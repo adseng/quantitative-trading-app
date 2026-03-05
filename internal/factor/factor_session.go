@@ -21,9 +21,10 @@ func (e *SignalContext) FactorSession(weight float64) *SignalContext {
 	}
 
 	priceChange := e.KLine.History[0].Close - e.KLine.History[1].Close
-	if priceChange > 0 {
+	// 回测结论：欧美盘下跌时下一根更易上涨
+	if priceChange < 0 {
 		e.AddBull(weight)
-	} else if priceChange < 0 {
+	} else if priceChange > 0 {
 		e.AddBear(weight)
 	}
 	return e

@@ -1,0 +1,18 @@
+Iteration: 1
+Time: 2026-03-05 14:15:05
+Excel: batch_test_log_20260305141504.xlsx
+Duration: 488ms
+Cases: 24
+Signal Accuracy: best=57.65% top10avg=57.30% avg=49.97% worst=42.28%
+
+=== TOP 10 ===
+ 1. #14  Break_P15_w-1                            Acc=57.65% Rate=10.7% Str=1.000 Avg=-0.060
+ 2. #12  Break_P12_w-1                            Acc=57.56% Rate=12.5% Str=1.000 Avg=-0.055
+ 3. #18  Break_P20_w-1                            Acc=57.54% Rate=8.8% Str=1.000 Avg=-0.070
+ 4. #16  Break_P18_w-1                            Acc=57.54% Rate=9.5% Str=1.000 Avg=-0.066
+ 5. #10  Break_P10_w-1                            Acc=57.52% Rate=14.1% Str=1.000 Avg=-0.050
+ 6. #8   Break_P8_w-1                             Acc=57.29% Rate=16.1% Str=1.000 Avg=-0.040
+ 7. #20  Break_P25_w-1                            Acc=57.07% Rate=7.6% Str=1.000 Avg=-0.072
+ 8. #6   Break_P7_w-1                             Acc=57.07% Rate=17.6% Str=1.000 Avg=-0.039
+ 9. #22  Break_P30_w-1                            Acc=57.07% Rate=6.7% Str=1.000 Avg=-0.077
+10. #24  Break_P40_w-1                            Acc=56.67% Rate=5.6% Str=1.000 Avg=-0.078

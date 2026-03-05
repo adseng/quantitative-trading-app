@@ -29,15 +29,15 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 		return fd
 	}
 
-	// 均线因子
+	// 均线因子：短期 < 长期 → 看涨（正向）；短期 > 长期 → 看跌
 	if cfg.UseMA {
 		prices := kl.ClosePrices()
 		if len(prices) >= cfg.MaLong {
 			shortMA := avg(prices[:cfg.MaShort])
 			longMA := avg(prices[:cfg.MaLong])
-			if shortMA > longMA {
+			if shortMA < longMA {
 				fd.MaScore = cfg.MaWeight
-			} else if shortMA < longMA {
+			} else if shortMA > longMA {
 				fd.MaScore = -cfg.MaWeight
 			}
 		}
@@ -56,9 +56,9 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 				}
 			}
 			diff := upCount - downCount
-			if diff > 0 {
+			if diff < 0 {
 				fd.TrendContrib = cfg.TrendWeight
-			} else if diff < 0 {
+			} else if diff > 0 {
 				fd.TrendContrib = -cfg.TrendWeight
 			}
 		}
@@ -102,9 +102,9 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 					if len(signalLine) > 0 {
 						lastMACD := macdLine[len(macdLine)-1]
 						lastSignal := signalLine[len(signalLine)-1]
-						if lastMACD > lastSignal {
+						if lastMACD < lastSignal {
 							fd.MacdContrib = cfg.MACDWeight
-						} else if lastMACD < lastSignal {
+						} else if lastMACD > lastSignal {
 							fd.MacdContrib = -cfg.MACDWeight
 						}
 					}
@@ -149,9 +149,9 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 				lowest = l
 			}
 		}
-		if currentClose > highest {
+		if currentClose < lowest {
 			fd.BreakoutContrib = cfg.BreakoutWeight
-		} else if currentClose < lowest {
+		} else if currentClose > highest {
 			fd.BreakoutContrib = -cfg.BreakoutWeight
 		}
 	}
@@ -161,9 +161,9 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 		prices := kl.ClosePrices()
 		if len(prices) >= cfg.PriceVsMAPeriod {
 			sma := avg(prices[:cfg.PriceVsMAPeriod])
-			if prices[0] > sma {
+			if prices[0] < sma {
 				fd.PriceVsMAContrib = cfg.PriceVsMAWeight
-			} else if prices[0] < sma {
+			} else if prices[0] > sma {
 				fd.PriceVsMAContrib = -cfg.PriceVsMAWeight
 			}
 		}
@@ -195,9 +195,9 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 		avgATR /= float64(cfg.ATRPeriod)
 		if currentATR > avgATR {
 			priceChange := kl.History[0].Close - kl.History[1].Close
-			if priceChange > 0 {
+			if priceChange < 0 {
 				fd.AtrContrib = cfg.ATRWeight
-			} else if priceChange < 0 {
+			} else if priceChange > 0 {
 				fd.AtrContrib = -cfg.ATRWeight
 			}
 		}
@@ -215,9 +215,9 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 			avgVol /= float64(cfg.VolumePeriod)
 			if currentVol > avgVol && len(kl.History) >= 2 {
 				priceChange := kl.History[0].Close - kl.History[1].Close
-				if priceChange > 0 {
+				if priceChange < 0 {
 					fd.VolumeContrib = cfg.VolumeWeight
-				} else if priceChange < 0 {
+				} else if priceChange > 0 {
 					fd.VolumeContrib = -cfg.VolumeWeight
 				}
 			}
@@ -230,9 +230,9 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 		hour := t.Hour()
 		if hour >= 8 { // 欧盘/美盘才出信号
 			priceChange := kl.History[0].Close - kl.History[1].Close
-			if priceChange > 0 {
+			if priceChange < 0 {
 				fd.SessionContrib = cfg.SessionWeight
-			} else if priceChange < 0 {
+			} else if priceChange > 0 {
 				fd.SessionContrib = -cfg.SessionWeight
 			}
 		}
@@ -246,9 +246,9 @@ func ComputeFactorDetailV2(kl *KLineHistory, cfg *FactorConfig) *FactorDetail {
 			w = 0
 		}
 		sig := detectMACrossSignal(prices, cfg.MACrossShort, cfg.MACrossLong, w, p)
-		if sig > 0 {
+		if sig < 0 {
 			fd.MACrossContrib = cfg.MACrossWeight
-		} else if sig < 0 {
+		} else if sig > 0 {
 			fd.MACrossContrib = -cfg.MACrossWeight
 		}
 	}

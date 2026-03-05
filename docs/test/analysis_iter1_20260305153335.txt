@@ -1,0 +1,42 @@
+Iteration: 1
+Time: 2026-03-05 15:33:35
+Excel: batch_test_log_20260305152001.xlsx
+Duration: 13m34.444s
+Cases: 2430
+Signal Accuracy: best=59.71% top10avg=58.94% avg=54.59% worst=51.47%
+
+=== TOP 10 ===
+ 1. #15  Boll_P13_M2.4                            Acc=59.71% Rate=3.8% Str=1.000 Avg=-0.005
+ 2. #3   Boll_P9_M2.4                             Acc=59.22% Rate=1.8% Str=1.000 Avg=-0.006
+ 3. #11  Boll_P12_M2.2                            Acc=58.98% Rate=6.1% Str=1.000 Avg=+0.007
+ 4. #14  Boll_P13_M2.2                            Acc=58.94% Rate=6.5% Str=1.000 Avg=+0.015
+ 5. #8   Boll_P11_M2.2                            Acc=58.90% Rate=5.6% Str=1.000 Avg=-0.003
+ 6. #12  Boll_P12_M2.4                            Acc=58.85% Rate=3.5% Str=1.000 Avg=-0.008
+ 7. #13  Boll_P13_M2.0                            Acc=58.78% Rate=10.4% Str=1.000 Avg=+0.006
+ 8. #5   Boll_P10_M2.2                            Acc=58.75% Rate=5.0% Str=1.000 Avg=+0.002
+ 9. #1   Boll_P9_M2.0                             Acc=58.66% Rate=8.1% Str=1.000 Avg=+0.005
+10. #4   Boll_P10_M2.0                            Acc=58.63% Rate=8.9% Str=1.000 Avg=+0.000
+
+=== 各组策略最优参数 ===
+Bo                 Boll_P13_M2.4                              Acc=59.71% Rate=3.8% | Bo P13 M2.4 w1.0
+Bo+A               Bo15M2.0_w2+A20_w1                         Acc=54.15% Rate=40.2% | Bo P15 M2.0 w2.0 ATR P20 w1.0
+Bo+Br              Bo13M2.2_w1+Br20_w1                        Acc=58.06% Rate=11.0% | Bo P13 M2.2 w1.0 Br P20 w1.0
+Bo+Br+A            Bo13M2.0_w1+Br12_w1+A20_w1.0               Acc=54.18% Rate=42.1% | Bo P13 M2.0 w1.0 Br P12 w1.0 ATR P20 w1.0
+Bo+Br+M            Bo12M2.0_w1+Br15_w1+M1_7_w0.5              Acc=52.85% Rate=100.0% | Bo P12 M2.0 w1.0 Br P15 w1.0 MA 1/7 w0.5
+Bo+Br+T            Bo13M2.0_w1+Br12_w1+T8_w0.5                Acc=52.79% Rate=72.3% | Bo P13 M2.0 w1.0 Br P12 w1.0 T N8 w0.5
+Bo+M               Bo10M2.0_w1+M1_7_w1                        Acc=52.84% Rate=100.0% | Bo P10 M2.0 w1.0 MA 1/7 w1.0
+Bo+Macd            Bo10M2.2_w2+Macd5_15_4_w1                  Acc=52.01% Rate=100.0% | Bo P10 M2.2 w2.0 Macd 5/15/4 w1.0
+Bo+Mc              Bo13M2.0_w1+Mc10_30_w1                     Acc=54.79% Rate=20.8% | Bo P13 M2.0 w1.0 Mc 10/30 w1.0
+Bo+Pv              Bo10M2.0_w1+Pv8_w1                         Acc=52.78% Rate=100.0% | Bo P10 M2.0 w1.0 Pv P8 w1.0
+Bo+R               Bo13M2.0_w1+R9_80_w1                       Acc=56.69% Rate=18.4% | Bo P13 M2.0 w1.0 RSI P9 80/20 w1.0
+Bo+R+A             Bo13M2.0_w2+R7_w1+A20_w1.0                 Acc=54.46% Rate=46.3% | Bo P13 M2.0 w2.0 RSI P7 80/20 w1.0 ATR P20 w1.0
+Bo+R+Br            R9_w1+Bo13M2.0_w1+Br15_w1                  Acc=56.48% Rate=20.7% | Bo P13 M2.0 w1.0 RSI P9 80/20 w1.0 Br P15 w1.0
+Bo+T               Bo13M2.0_w2+T8_w1                          Acc=52.76% Rate=71.7% | Bo P13 M2.0 w2.0 T N8 w1.0
+Bo+V               Bo13M2.0_w2+V5_w1                          Acc=53.84% Rate=39.5% | Bo P13 M2.0 w2.0 V P5 w1.0
+Br                 Break_P15                                  Acc=57.65% Rate=10.7% | Br P15 w1.0
+Br+A               Br10_w1+A20_w1                             Acc=54.08% Rate=42.3% | Br P10 w1.0 ATR P20 w1.0
+M+T                M1_7_w1+T12_w1                             Acc=53.37% Rate=78.2% | MA 1/7 w1.0 T N12 w1.0
+R                  RSI_P7_80_20                               Acc=55.81% Rate=17.2% | RSI P7 80/20 w1.0
+R+A                R7_80_w1+A20_w1                            Acc=54.31% Rate=45.3% | RSI P7 80/20 w1.0 ATR P20 w1.0
+R+Br               R7_80_w1+Br12_w1                           Acc=56.25% Rate=23.6% | RSI P7 80/20 w1.0 Br P12 w1.0
+R+Br+A             R7_80_w1+Br10_w1+A20_w1.0                  Acc=54.43% Rate=47.5% | RSI P7 80/20 w1.0 Br P10 w1.0 ATR P20 w1.0

@@ -1,0 +1,18 @@
+Iteration: 1
+Time: 2026-03-05 13:21:21
+Excel: batch_test_log_20260305132120.xlsx
+Duration: 376ms
+Cases: 16
+Signal Accuracy: best=51.55% top10avg=50.71% avg=49.96% worst=48.37%
+
+=== TOP 10 ===
+ 1. #2   MA_5_10_w-1                              Acc=51.55% Rate=100.0% Str=1.000 Avg=-0.020
+ 2. #4   MA_5_20_w-1                              Acc=51.50% Rate=100.0% Str=1.000 Avg=-0.032
+ 3. #6   MA_5_30_w-1                              Acc=51.31% Rate=100.0% Str=1.000 Avg=-0.035
+ 4. #8   MA_10_20_w-1                             Acc=51.09% Rate=100.0% Str=1.000 Avg=-0.031
+ 5. #10  MA_10_30_w-1                             Acc=50.99% Rate=100.0% Str=1.000 Avg=-0.032
+ 6. #12  MA_15_30_w-1                             Acc=50.80% Rate=100.0% Str=1.000 Avg=-0.032
+ 7. #14  MA_20_60_w-1                             Acc=50.48% Rate=100.0% Str=1.000 Avg=-0.036
+ 8. #16  MA_30_60_w-1                             Acc=50.32% Rate=100.0% Str=1.000 Avg=-0.035
+ 9. #15  MA_30_60_w1                              Acc=49.60% Rate=100.0% Str=1.000 Avg=+0.035
+10. #13  MA_20_60_w1                              Acc=49.44% Rate=100.0% Str=1.000 Avg=+0.036

@@ -1,0 +1,18 @@
+Iteration: 1
+Time: 2026-03-05 12:24:47
+Excel: batch_test_log_20260305122440.xlsx
+Duration: 6.634s
+Cases: 129
+Signal Accuracy: best=53.78% top10avg=53.65% avg=49.79% worst=46.16%
+
+=== TOP 10 ===
+ 1. #86  ATR_P20_w-1                              Acc=53.78% Rate=38.6% Str=1.000 Avg=-0.003
+ 2. #84  ATR_P18_w-1                              Acc=53.75% Rate=38.7% Str=1.000 Avg=-0.001
+ 3. #76  ATR_P7_w-1                               Acc=53.71% Rate=41.0% Str=1.000 Avg=-0.001
+ 4. #74  ATR_P5_w-1                               Acc=53.67% Rate=42.1% Str=1.000 Avg=+0.002
+ 5. #90  Vol_P5_w-1                               Acc=53.65% Rate=38.4% Str=1.000 Avg=+0.004
+ 6. #80  ATR_P12_w-1                              Acc=53.64% Rate=39.7% Str=1.000 Avg=-0.002
+ 7. #88  ATR_P30_w-1                              Acc=53.62% Rate=38.2% Str=1.000 Avg=-0.006
+ 8. #82  ATR_P14_w-1                              Acc=53.61% Rate=39.4% Str=1.000 Avg=-0.001
+ 9. #104 Vol_P40_w-1                              Acc=53.60% Rate=33.6% Str=1.000 Avg=+0.006
+10. #102 Vol_P30_w-1                              Acc=53.50% Rate=34.1% Str=1.000 Avg=+0.006

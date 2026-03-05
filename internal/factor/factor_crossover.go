@@ -43,7 +43,8 @@ func detectMACrossSignal(prices []float64, shortPeriod, longPeriod int, window i
 }
 
 // FactorMACross 均线金叉/死叉因子（事件型 + 时间容错 + 预判）
-// 金叉 → +1，死叉 → -1，否则 0
+// 回测结论：死叉时下一根更易上涨，故输出正向看涨信号。
+// 金叉 → 看跌；死叉 → 看涨；否则 0
 //
 // MA 有延后性，因此：
 //   - 时间容错(window): 当前 K 线「左侧」最近 window 根内若有金叉/死叉，仍记为有效
@@ -60,9 +61,9 @@ func (e *SignalContext) FactorMACross(shortPeriod, longPeriod int, weight float6
 	}
 	prices := e.KLine.ClosePrices()
 	sig := detectMACrossSignal(prices, shortPeriod, longPeriod, window, preempt)
-	if sig > 0 {
+	if sig < 0 {
 		e.AddBull(weight)
-	} else if sig < 0 {
+	} else if sig > 0 {
 		e.AddBear(weight)
 	}
 	return e

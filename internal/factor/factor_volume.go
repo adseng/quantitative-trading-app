@@ -1,7 +1,7 @@
 package factor
 
 // FactorVolume 量价配合因子：成交量高于 N 周期均量时，结合价格方向给出信号。
-// 放量上涨 → 看涨；放量下跌 → 看跌；缩量或量能平淡 → 无信号。
+// 回测结论：放量下跌时下一根更易上涨，故输出正向看涨信号。放量上涨 → 看跌；放量下跌 → 看涨。
 // period: 均量周期（常用20），weight: 权重。
 func (e *SignalContext) FactorVolume(period int, weight float64) *SignalContext {
 	if e.KLine == nil || len(e.KLine.History) < period+1 {
@@ -25,9 +25,9 @@ func (e *SignalContext) FactorVolume(period int, weight float64) *SignalContext 
 	}
 
 	priceChange := e.KLine.History[0].Close - e.KLine.History[1].Close
-	if priceChange > 0 {
+	if priceChange < 0 {
 		e.AddBull(weight)
-	} else if priceChange < 0 {
+	} else if priceChange > 0 {
 		e.AddBear(weight)
 	}
 	return e

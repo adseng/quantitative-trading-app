@@ -1,0 +1,21 @@
+Iteration: 1
+Time: 2026-03-05 15:45:25
+Excel: batch_test_log_20260305154512.xlsx
+Duration: 12.469s
+Cases: 192
+Signal Accuracy: best=53.03% top10avg=53.03% avg=52.75% worst=52.26%
+
+=== TOP 10 ===
+ 1. #149 R7+Bo13M2.0+Br12+T6_w0.50                Acc=53.03% Rate=69.8% Str=1.041 Avg=-0.021
+ 2. #148 R7+Bo13M2.0+Br12+T6_w0.25                Acc=53.03% Rate=69.8% Str=0.807 Avg=-0.019
+ 3. #150 R7+Bo13M2.0+Br12+T6_w0.75                Acc=53.03% Rate=69.8% Str=1.274 Avg=-0.024
+ 4. #101 R7+Bo12M2.0+Br12+T6_w0.50                Acc=53.03% Rate=69.8% Str=1.035 Avg=-0.022
+ 5. #102 R7+Bo12M2.0+Br12+T6_w0.75                Acc=53.03% Rate=69.8% Str=1.268 Avg=-0.024
+ 6. #100 R7+Bo12M2.0+Br12+T6_w0.25                Acc=53.03% Rate=69.8% Str=0.802 Avg=-0.019
+ 7. #162 R7+Bo13M2.0+Br15+T6_w0.75                Acc=53.02% Rate=69.7% Str=1.251 Avg=-0.023
+ 8. #160 R7+Bo13M2.0+Br15+T6_w0.25                Acc=53.02% Rate=69.7% Str=0.783 Avg=-0.018
+ 9. #161 R7+Bo13M2.0+Br15+T6_w0.50                Acc=53.02% Rate=69.7% Str=1.017 Avg=-0.021
+10. #114 R7+Bo12M2.0+Br15+T6_w0.75                Acc=53.02% Rate=69.7% Str=1.245 Avg=-0.023
+
+=== 各组策略最优参数 ===
+Bo+R+Br+T          R7+Bo13M2.0+Br12+T6_w0.25                  Acc=53.03% Rate=69.8% | Bo P13 M2.0 w1.0 RSI P7 80/20 w1.0 Br P12 w1.0 T N6 w0.2

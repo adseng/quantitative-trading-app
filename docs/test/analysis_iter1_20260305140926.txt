@@ -1,0 +1,18 @@
+Iteration: 1
+Time: 2026-03-05 14:09:26
+Excel: batch_test_log_20260305140925.xlsx
+Duration: 1.115s
+Cases: 16
+Signal Accuracy: best=51.90% top10avg=51.06% avg=49.96% worst=48.01%
+
+=== TOP 10 ===
+ 1. #12  MACD_5_15_5_w-1                          Acc=51.90% Rate=100.0% Str=1.000 Avg=-0.001
+ 2. #2   MACD_6_13_5_w-1                          Acc=51.86% Rate=100.0% Str=1.000 Avg=-0.001
+ 3. #8   MACD_5_20_7_w-1                          Acc=51.84% Rate=100.0% Str=1.000 Avg=-0.001
+ 4. #14  MACD_12_26_5_w-1                         Acc=51.77% Rate=100.0% Str=1.000 Avg=-0.002
+ 5. #4   MACD_8_17_6_w-1                          Acc=51.77% Rate=100.0% Str=1.000 Avg=-0.003
+ 6. #10  MACD_10_20_8_w-1                         Acc=51.63% Rate=100.0% Str=1.000 Avg=-0.001
+ 7. #16  MACD_12_26_12_w-1                        Acc=51.49% Rate=100.0% Str=1.000 Avg=-0.002
+ 8. #6   MACD_12_26_9_w-1                         Acc=51.47% Rate=100.0% Str=1.000 Avg=-0.001
+ 9. #5   MACD_12_26_9_w1                          Acc=48.45% Rate=100.0% Str=1.000 Avg=+0.001
+10. #15  MACD_12_26_12_w1                         Acc=48.43% Rate=100.0% Str=1.000 Avg=+0.002

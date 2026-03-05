@@ -4,3 +4,11 @@ frontend/dist
 
 # 本地配置，含 API 密钥，勿提交
 .env.local
+
+# 各种平台相关文件
+.DS_Store
+.idea
+.vscode
+.cursorrules
+.cursorignore
+.cursor

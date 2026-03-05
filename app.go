@@ -6,6 +6,7 @@ import (
 
 	"quantitative-trading-app/internal/backtestlog"
 	"quantitative-trading-app/internal/batchtest"
+	"quantitative-trading-app/internal/batchtest/cases"
 	"quantitative-trading-app/internal/binance"
 	"quantitative-trading-app/internal/config"
 	"quantitative-trading-app/internal/factor"
@@ -34,7 +35,7 @@ func (a *App) startup(ctx context.Context) {
 
 // FetchKlines 从币安合约获取 K 线数据，按时间升序返回。
 func (a *App) FetchKlines(symbol, interval string, limit int64) ([]factor.KLine, error) {
-	kl, err := binance.FetchKlines(symbol, interval, limit)
+	kl, err := binance.FetchKlines(symbol, interval, limit, nil)
 	if err != nil || kl == nil {
 		return nil, err
 	}
@@ -147,17 +148,18 @@ func (a *App) StartBatchTest() error {
 
 		emit(batchtest.ProgressEvent{Phase: "fetching", Message: "首次运行，开始获取 K 线数据（100轮 × 1000根）..."})
 
-		klines, err := binance.FetchKlinesChunked(
-			"BTCUSDT", "15m",
-			1000, 100, 600,
-			func(round, totalRounds, fetched int) {
+		klines, err := binance.FetchKlines("BTCUSDT", "15m", 0, &binance.FetchKlinesOpts{
+			PerReq:  1000,
+			Chunks: 100,
+			DelayMs: 600,
+			ProgressFn: func(round, totalRounds, fetched int) {
 				emit(batchtest.ProgressEvent{
 					Phase:   "fetching",
 					Message: fmt.Sprintf("获取 K 线: %d/%d 轮, 已获取 %d 根", round, totalRounds, fetched),
 				})
 			},
-			a.cancelFetch,
-		)
+			CancelCh: a.cancelFetch,
+		})
 		if err != nil {
 			emit(batchtest.ProgressEvent{Phase: "error", Message: "获取 K 线失败: " + err.Error()})
 			return
@@ -194,4 +196,12 @@ func (a *App) GetBatchTestProgress() map[string]interface{} {
 		"nextIndex":  a.batchRunner.NextIndex(),
 		"totalCases": a.batchRunner.TotalCases(),
 	}
+}
+
+// GetBatchTestResults 获取最近的回测结果（用于页面初始化展示，从 Excel 加载历史数据）。
+func (a *App) GetBatchTestResults(maxN int) []cases.TestResult {
+	if maxN <= 0 {
+		maxN = 200
+	}
+	return a.batchRunner.GetLastResults(maxN)
 }
