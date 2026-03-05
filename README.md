@@ -1,19 +1,84 @@
-# README
+# 多因子量化分析工具
 
-## About
+多因子技术指标量化分析工具，将各类技术指标转化为**看涨/看跌**信号，通过加权评分预测下一根 K 线方向，支持回测、批量验证与进化式自动调参。
 
-This is the official Wails Vue-TS template.
+## 研究方向
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+```
+输入: 技术指标因子 → 每因子输出信号(0/1/-1) → 影响力 = 权重 × 信号
+     → 看涨/看跌总积分 → 预测下一根K线方向 → 回测验证 + 自动调参
+```
 
-## Live Development
+**核心假设**：多个因子的加权投票能提高方向预测的胜率。
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+**研究路线**：V1 全因子探索 → V3/V4 最优方向+参数网格 → V5/V6 进化算法自动调参。
 
-## Building
+## 技术方案
 
-To build a redistributable, production mode package, use `wails build`.
+| 层级 | 选型 |
+|------|------|
+| 桌面框架 | Wails (Go + Web) |
+| 前端 | TypeScript + Vite + React |
+| 数据源 | Binance 正式网（历史 K 线） |
+| 标的 | BTCUSDT 永续合约 15 分钟 |
+
+## 成果概览
+
+### 因子库（11 个已实现）
+
+| 类别 | 因子 |
+|------|------|
+| 价格/趋势 | MA、Trend、Breakout、PriceVsMA、ATR |
+| 成交量 | Volume |
+| 技术指标 | RSI、MACD、Boll、MACross |
+| 时间 | Session |
+
+### 核心研究结论
+
+1. **市场结构发现**：BTC 15m 是短线均值回归市场。趋势跟随因子（MA/MACD/Breakout 等）需**负权重反转**才有效，均值回归因子（Boll/RSI）按教科书方向有效。
+
+2. **最优单因子**：布林带 Boll P13 M2.4 → **信号正确率 59.71%**（进化算法自动发现，V5/V6 两次独立运行均收敛到此参数）。
+
+3. **因子组合帕累托前沿**：
+   - 双因子：Boll + Breakout(-) → 57.2% @ 18.5% 信号率
+   - 三因子：RSI7 + Boll15 + Break10(-) → 55.5% @ 32.9%（平衡型推荐）
+   - 四因子：+ATR7(-) → 54.2% @ 54.1%（高频型）
+
+4. **正确率 vs 信号率权衡**：Boll 乘数 M2.0 → 高正确率低信号；M1.2 → 信号多正确率降。帕累托前沿已明确。
+
+5. **进化式调参有效**：V5/V6 从 58.63% 提升至 59.71%（+1.08%），收敛到 Bo13M2.4，结果可重复。
+
+## 项目结构
+
+```
+quantitative-trading/
+├── internal/
+│   ├── factor/           # 11 个因子 + 回测逻辑
+│   ├── batchtest/        # 批量测试用例 + 进化算法
+│   ├── binance/          # 数据获取
+│   └── config/           # 配置
+├── cmd/
+│   ├── fetchdata/        # 下载 K 线数据
+│   ├── autotest/         # 进化式自动测试
+│   ├── readexcel/        # 读取批量测试结果
+│   └── siminvest/        # 策略收益模拟
+└── frontend/             # React UI
+```
+
+## 快速开始
+
+```bash
+# 下载 K 线数据（需代理）
+$env:HTTPS_PROXY="http://127.0.0.1:7897"
+go run ./cmd/fetchdata
+
+# 进化式自动调参（20 轮）
+go run ./cmd/autotest -n 20
+
+# 策略收益模拟
+go run ./cmd/siminvest
+```
+
+## 文档
+
+详见 [docs/整理plan.md](docs/整理plan.md)，包含 V1~V6 完整测试结论、用例设计与进化算法说明。
