@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+
+:root {
+  font-family: system-ui, sans-serif;
+  color: #242f57;
+  background: #f4f7fc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
