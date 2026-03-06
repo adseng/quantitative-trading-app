@@ -139,7 +139,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
     // Formatters read from refs so they always reflect the latest data
     // without needing to be recreated on every update.
     chart.setOption({
-      backgroundColor: '#0b0e11',
+      backgroundColor: 'transparent',
       animation: false,
       axisPointer: {
         show: true,
@@ -200,8 +200,6 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
           },
           splitLine: { show: false },
           axisTick: { show: false },
-          min: 'dataMin',
-          max: 'dataMax',
         },
         {
           type: 'category',
@@ -218,8 +216,6 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
           },
           splitLine: { show: false },
           axisTick: { show: false },
-          min: 'dataMin',
-          max: 'dataMax',
         },
       ],
       yAxis: [
@@ -279,7 +275,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
           textStyle: { color: '#6b7280', fontSize: 10 },
         },
       ],
-      graphic: [buildWatermarkGraphic()],
+      graphic: [],
       series: [
         {
           name: 'K',
@@ -454,8 +450,11 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
       const priceDigits = latestClose < 1 ? 6 : latestClose < 100 ? 4 : 2
       priceDigitsRef.current = priceDigits
 
+      const rightGap = 4
+      const totalBars = times.length + rightGap
+      const xAxisMax = Math.max(times.length - 1 + rightGap, 0)
       const bars = Math.max(1, visibleBars)
-      const defaultStart = klines.length <= bars ? 0 : 100 - (bars / klines.length) * 100
+      const defaultStart = totalBars <= bars ? 0 : 100 - (bars / totalBars) * 100
       const useDefaultZoom = lastChartUpdateRef.current === 0 || dataZoomRef.current == null
       let start = defaultStart
       let end = 100
@@ -477,7 +476,10 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
       dataZoomRef.current = { start, end }
 
       chart.setOption({
-        xAxis: [{ data: times }, { data: times }],
+        xAxis: [
+          { data: times, min: 0, max: xAxisMax },
+          { data: times, min: 0, max: xAxisMax },
+        ],
         dataZoom: [{ start, end }, { start, end }],
         series: [
           {
@@ -663,21 +665,6 @@ function getDisplayMetrics(klines: KLine[], chartData: ReturnType<typeof buildCh
   }
 }
 
-function buildWatermarkGraphic() {
-  return {
-    id: 'watermark',
-    type: 'text',
-    left: 'center',
-    top: 150,
-    style: {
-      text: 'BINANCE',
-      fontSize: 42,
-      fontWeight: 700,
-      fill: 'rgba(132, 142, 156, 0.08)',
-    },
-    silent: true,
-  }
-}
 
 function overlayRowStyle(top: number, left: number, gap: number): CSSProperties {
   return {

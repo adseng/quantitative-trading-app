@@ -21,7 +21,7 @@ export default function CozePredict() {
   const [interval, setInterval] = useState('15m')
   const [limit, setLimit] = useState(1000)
   const [visibleBars, setVisibleBars] = useState(100)
-  const [cozeKlineCount, setCozeKlineCount] = useState(50)
+  const [cozeKlineCount, setCozeKlineCount] = useState(20)
   const [cozeIntervalMinutes, setCozeIntervalMinutes] = useState(2)
 
   const {
@@ -139,7 +139,7 @@ export default function CozePredict() {
             min={5}
             max={500}
             value={normalizedCozeKlineCount}
-            onChange={(value) => setCozeKlineCount(value == null ? 50 : Number(value))}
+            onChange={(value) => setCozeKlineCount(value == null ? 20 : Number(value))}
             style={{ width: 88 }}
           />
           <Button onClick={() => void triggerPredict()} loading={predicting} disabled={klines.length < 5}>

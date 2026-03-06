@@ -7,7 +7,7 @@ import { coze } from '@wails/go/models'
 import type { CozeResult, CozeStatusEvent } from '../types'
 
 function normalizeCount(count: number): number {
-  const value = Number(count) || 50
+  const value = Number(count) || 20
   return Math.min(500, Math.max(5, value))
 }
 
