@@ -14,9 +14,15 @@ function formatPrice(value: number, digits: number = 2): string {
 }
 
 function formatVolume(value: number): string {
-  if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`
-  if (value >= 1e3) return `${(value / 1e3).toFixed(3)}K`
-  return value.toFixed(2)
+  const formatWithUnit = (scaled: number, unit: string) => `${trimTrailingZeros(scaled.toFixed(3))}${unit}`
+  if (value >= 1e9) return formatWithUnit(value / 1e9, 'B')
+  if (value >= 1e6) return formatWithUnit(value / 1e6, 'M')
+  if (value >= 1e3) return formatWithUnit(value / 1e3, 'K')
+  return trimTrailingZeros(value.toFixed(3))
+}
+
+function trimTrailingZeros(value: string): string {
+  return value.replace(/\.?0+$/, '')
 }
 
 function formatTimeOnly(timestamp: number): string {
@@ -151,6 +157,17 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
         const end = Number(payload?.end)
         if (Number.isFinite(start) && Number.isFinite(end)) {
           dataZoomRef.current = { start, end }
+          return
+        }
+
+        const startValue = Number(payload?.startValue)
+        const endValue = Number(payload?.endValue)
+        const total = klinesRef.current.length
+        if (Number.isFinite(startValue) && Number.isFinite(endValue) && total > 1) {
+          dataZoomRef.current = {
+            start: (startValue / total) * 100,
+            end: ((endValue + 1) / total) * 100,
+          }
         }
       }
       chart.on('datazoom', dataZoomHandlerRef.current)
@@ -197,18 +214,18 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
       const priceDigits = latestMetrics.priceDigits
 
       const bars = Math.max(1, visibleBars)
-      const defaultZoomStart = klines.length <= bars ? 0 : 100 - (bars / klines.length) * 100
-      const defaultZoomEnd = 100
+      const defaultStart = klines.length <= bars ? 0 : 100 - (bars / klines.length) * 100
+      const defaultEnd = 100
       const useDefaultZoom = lastChartUpdateRef.current === 0 || dataZoomRef.current == null
-      let start = defaultZoomStart
-      let end = defaultZoomEnd
+      let start = defaultStart
+      let end = defaultEnd
 
       if (!useDefaultZoom) {
         const prevOpt = chartInstance.current?.getOption() as any
         const zoom = Array.isArray(prevOpt?.dataZoom) ? prevOpt.dataZoom.find((item: any) => item.xAxisIndex != null) : null
         if (zoom?.start != null && zoom?.end != null) {
-          start = zoom.start
-          end = zoom.end
+          start = Number(zoom.start)
+          end = Number(zoom.end)
         } else if (dataZoomRef.current) {
           start = dataZoomRef.current.start
           end = dataZoomRef.current.end
@@ -336,7 +353,16 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
             },
           ],
           dataZoom: [
-            { type: 'inside', xAxisIndex: [0, 1], start, end },
+            {
+              type: 'inside',
+              xAxisIndex: [0, 1],
+              start,
+              end,
+              zoomOnMouseWheel: false,
+              moveOnMouseMove: true,
+              moveOnMouseWheel: true,
+              preventDefaultMouseMove: true,
+            },
             {
               type: 'slider',
               xAxisIndex: [0, 1],
@@ -507,25 +533,64 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
         overflow: 'hidden',
       }}
     >
-      <div style={overlayRowStyle(8, 54)}>
-        <span style={textStyle('#848e9c', 400)}>{displayMetrics.timeText}</span>
-        <span style={textStyle('#eaecef')}>{`开 ${formatPrice(displayMetrics.open, displayMetrics.priceDigits)}`}</span>
-        <span style={textStyle('#eaecef')}>{`高 ${formatPrice(displayMetrics.high, displayMetrics.priceDigits)}`}</span>
-        <span style={textStyle('#eaecef')}>{`低 ${formatPrice(displayMetrics.low, displayMetrics.priceDigits)}`}</span>
-        <span style={textStyle(displayMetrics.changeColor, 600)}>{`收 ${formatPrice(displayMetrics.close, displayMetrics.priceDigits)}`}</span>
-        <span style={textStyle(displayMetrics.changeColor, 600)}>{`涨跌 ${displayMetrics.change >= 0 ? '+' : ''}${displayMetrics.change.toFixed(2)}%`}</span>
-        <span style={textStyle('#848e9c')}>{`振幅 ${displayMetrics.amplitude.toFixed(2)}%`}</span>
+      <div style={overlayRowStyle(8, 54, 6)}>
+        <span style={metricCellStyle(108, '#848e9c', 400)}>{displayMetrics.timeText}</span>
+        <span style={metricCellStyle(78, '#eaecef')}>
+          <span style={metricLabelStyle}>开 </span>
+          <span style={metricValueStyle(displayMetrics.changeColor)}>{formatPrice(displayMetrics.open, displayMetrics.priceDigits)}</span>
+        </span>
+        <span style={metricCellStyle(78, '#eaecef')}>
+          <span style={metricLabelStyle}>高 </span>
+          <span style={metricValueStyle(displayMetrics.changeColor)}>{formatPrice(displayMetrics.high, displayMetrics.priceDigits)}</span>
+        </span>
+        <span style={metricCellStyle(78, '#eaecef')}>
+          <span style={metricLabelStyle}>低 </span>
+          <span style={metricValueStyle(displayMetrics.changeColor)}>{formatPrice(displayMetrics.low, displayMetrics.priceDigits)}</span>
+        </span>
+        <span style={metricCellStyle(92, displayMetrics.changeColor, 600)}>
+          <span style={metricLabelStyle}>收 </span>
+          <span style={metricValueStyle(displayMetrics.changeColor, 600)}>{formatPrice(displayMetrics.close, displayMetrics.priceDigits)}</span>
+        </span>
+        <span style={metricCellStyle(102, displayMetrics.changeColor, 600)}>
+          <span style={metricLabelStyle}>涨跌幅 </span>
+          <span style={metricValueStyle(displayMetrics.changeColor, 600)}>{`${displayMetrics.change >= 0 ? '+' : ''}${displayMetrics.change.toFixed(2)}%`}</span>
+        </span>
+        <span style={metricCellStyle(76, '#848e9c')}>
+          <span style={metricLabelStyle}>振幅 </span>
+          <span style={metricValueStyle(displayMetrics.changeColor)}>{`${displayMetrics.amplitude.toFixed(2)}%`}</span>
+        </span>
       </div>
-      <div style={overlayRowStyle(24, 54)}>
-        <span style={textStyle('#f0b90b')}>{`MA(7) ${displayMetrics.ma7 != null ? formatPrice(displayMetrics.ma7, displayMetrics.priceDigits) : '-'}`}</span>
-        <span style={textStyle('#d946ef')}>{`MA(25) ${displayMetrics.ma25 != null ? formatPrice(displayMetrics.ma25, displayMetrics.priceDigits) : '-'}`}</span>
-        <span style={textStyle('#7c3aed')}>{`MA(99) ${displayMetrics.ma99 != null ? formatPrice(displayMetrics.ma99, displayMetrics.priceDigits) : '-'}`}</span>
+      <div style={overlayRowStyle(24, 54, 12)}>
+        <span style={metricCellStyle(118, '#f0b90b')}>
+          <span style={metricLabelStyle}>MA(7) </span>
+          <span style={metricValueStyle('#f0b90b')}>{displayMetrics.ma7 != null ? formatPrice(displayMetrics.ma7, displayMetrics.priceDigits) : '-'}</span>
+        </span>
+        <span style={metricCellStyle(126, '#d946ef')}>
+          <span style={metricLabelStyle}>MA(25) </span>
+          <span style={metricValueStyle('#d946ef')}>{displayMetrics.ma25 != null ? formatPrice(displayMetrics.ma25, displayMetrics.priceDigits) : '-'}</span>
+        </span>
+        <span style={metricCellStyle(126, '#7c3aed')}>
+          <span style={metricLabelStyle}>MA(99) </span>
+          <span style={metricValueStyle('#7c3aed')}>{displayMetrics.ma99 != null ? formatPrice(displayMetrics.ma99, displayMetrics.priceDigits) : '-'}</span>
+        </span>
       </div>
-      <div style={overlayRowStyle(398, 54)}>
-        <span style={textStyle('#848e9c')}>{`Vol(BTC) ${formatVolume(displayMetrics.volume)}`}</span>
-        <span style={textStyle('#848e9c')}>{`Vol(USDT) ${formatVolume(displayMetrics.volume * displayMetrics.close)}`}</span>
-        <span style={textStyle('#38bdf8')}>{`MA5 ${displayMetrics.volMA5 != null ? formatVolume(displayMetrics.volMA5) : '-'}`}</span>
-        <span style={textStyle('#fb7185')}>{`MA10 ${displayMetrics.volMA10 != null ? formatVolume(displayMetrics.volMA10) : '-'}`}</span>
+      <div style={overlayRowStyle(398, 54, 10)}>
+        <span style={metricCellStyle(88, '#848e9c')}>
+          <span style={metricLabelStyle}>Vol(BTC) </span>
+          <span style={metricValueStyle('#eaecef')}>{formatVolume(displayMetrics.volume)}</span>
+        </span>
+        <span style={metricCellStyle(126, '#848e9c')}>
+          <span style={metricLabelStyle}>Vol(USDT) </span>
+          <span style={metricValueStyle('#eaecef')}>{formatVolume(displayMetrics.quoteVolume)}</span>
+        </span>
+        <span style={metricCellStyle(84, '#38bdf8')}>
+          <span style={metricLabelStyle}>MA5 </span>
+          <span style={metricValueStyle('#38bdf8')}>{displayMetrics.volMA5 != null ? formatVolume(displayMetrics.volMA5) : '-'}</span>
+        </span>
+        <span style={metricCellStyle(88, '#fb7185')}>
+          <span style={metricLabelStyle}>MA10 </span>
+          <span style={metricValueStyle('#fb7185')}>{displayMetrics.volMA10 != null ? formatVolume(displayMetrics.volMA10) : '-'}</span>
+        </span>
       </div>
       <div
         ref={chartRef}
@@ -561,6 +626,7 @@ function getDisplayMetrics(klines: KLine[], chartData: ReturnType<typeof buildCh
   const high = current?.high ?? 0
   const low = current?.low ?? 0
   const volume = current?.volume ?? 0
+  const quoteVolume = current?.quoteAssetVolume ?? 0
   const change = open ? ((close - open) / open) * 100 : 0
   const amplitude = open ? ((high - low) / open) * 100 : 0
   const changeColor = close >= open ? upColor : downColor
@@ -579,6 +645,7 @@ function getDisplayMetrics(klines: KLine[], chartData: ReturnType<typeof buildCh
     high,
     low,
     volume,
+    quoteVolume,
     change,
     amplitude,
     changeColor,
@@ -607,28 +674,48 @@ function buildWatermarkGraphic() {
   }
 }
 
-function overlayRowStyle(top: number, left: number): CSSProperties {
+function overlayRowStyle(top: number, left: number, gap: number): CSSProperties {
   return {
     position: 'absolute',
     top,
     left,
     right: 72,
     display: 'flex',
-    gap: 16,
+    gap,
     alignItems: 'center',
-    flexWrap: 'wrap',
     pointerEvents: 'none',
     zIndex: 2,
   }
 }
 
-function textStyle(color: string, fontWeight: number = 500): CSSProperties {
+function metricCellStyle(width: number, color: string, fontWeight: number = 500): CSSProperties {
   return {
+    width,
+    minWidth: width,
+    maxWidth: width,
     color,
+    display: 'inline-flex',
+    alignItems: 'center',
     fontSize: 11,
     fontWeight,
     lineHeight: '16px',
     whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'clip',
+    fontVariantNumeric: 'tabular-nums',
+    letterSpacing: '-0.1px',
+  }
+}
+
+const metricLabelStyle: CSSProperties = {
+  color: '#848e9c',
+  fontWeight: 400,
+}
+
+function metricValueStyle(color: string, fontWeight: number = 500): CSSProperties {
+  return {
+    color,
+    fontWeight,
   }
 }
 
