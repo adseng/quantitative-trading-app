@@ -143,6 +143,79 @@ export namespace cases {
 
 }
 
+export namespace coze {
+	
+	export class CozeScenario {
+	    direction: string;
+	    probability: number;
+	    setup_logic: string;
+	    trigger_condition: string;
+	    entry_price?: number;
+	    stop_loss?: number;
+	    take_profit_1?: number;
+	    take_profit_2?: number;
+	    risk_reward_ratio?: number;
+	    action: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CozeScenario(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.direction = source["direction"];
+	        this.probability = source["probability"];
+	        this.setup_logic = source["setup_logic"];
+	        this.trigger_condition = source["trigger_condition"];
+	        this.entry_price = source["entry_price"];
+	        this.stop_loss = source["stop_loss"];
+	        this.take_profit_1 = source["take_profit_1"];
+	        this.take_profit_2 = source["take_profit_2"];
+	        this.risk_reward_ratio = source["risk_reward_ratio"];
+	        this.action = source["action"];
+	    }
+	}
+	export class CozeStructuredResult {
+	    timestamp: string;
+	    symbol: string;
+	    current_price: number;
+	    market_structure: string;
+	    scenarios: CozeScenario[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CozeStructuredResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.timestamp = source["timestamp"];
+	        this.symbol = source["symbol"];
+	        this.current_price = source["current_price"];
+	        this.market_structure = source["market_structure"];
+	        this.scenarios = this.convertValues(source["scenarios"], CozeScenario);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace factor {
 	
 	export class FactorDetail {

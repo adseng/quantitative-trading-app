@@ -56,12 +56,14 @@ quantitative-trading/
 │   ├── factor/           # 11 个因子 + 回测逻辑
 │   ├── batchtest/        # 批量测试用例 + 进化算法
 │   ├── binance/          # 数据获取
+│   ├── coze/             # Coze 智能体 K 线预测
 │   └── config/           # 配置
 ├── cmd/
 │   ├── fetchdata/        # 下载 K 线数据
 │   ├── autotest/         # 进化式自动测试
 │   ├── readexcel/        # 读取批量测试结果
-│   └── siminvest/        # 策略收益模拟
+│   ├── siminvest/        # 策略收益模拟
+│   └── cozepredict/      # Coze 智能体预测 K 线短期走势
 └── frontend/             # React UI
 ```
 
@@ -77,6 +79,9 @@ go run ./cmd/autotest -n 20
 
 # 策略收益模拟
 go run ./cmd/siminvest
+
+# Coze 智能体预测 K 线短期走势（需在 .env.local 配置 COZE_API_TOKEN、COZE_BOT_ID）
+go run ./cmd/cozepredict
 ```
 
 ## 文档

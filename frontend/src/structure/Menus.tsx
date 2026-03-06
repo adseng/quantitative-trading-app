@@ -1,5 +1,5 @@
 import { ROUTES } from '@/router/settings'
-import { ExperimentOutlined, InfoCircleOutlined, LineChartOutlined, SettingOutlined } from '@ant-design/icons'
+import { ExperimentOutlined, InfoCircleOutlined, LineChartOutlined, RobotOutlined, SettingOutlined } from '@ant-design/icons'
 
 export const MENUS = [
   {
@@ -11,6 +11,11 @@ export const MENUS = [
     label: '批量测试',
     value: ROUTES.BATCH_TEST,
     icon: <ExperimentOutlined className="text-[20px]" />,
+  },
+  {
+    label: 'Coze 预测',
+    value: ROUTES.COZE_PREDICT,
+    icon: <RobotOutlined className="text-[20px]" />,
   },
   {
     label: '配置',

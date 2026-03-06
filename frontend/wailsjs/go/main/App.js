@@ -10,6 +10,10 @@ export function BacktestEmotionV2(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8
   return window['go']['main']['App']['BacktestEmotionV2'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, arg21, arg22, arg23, arg24, arg25, arg26, arg27, arg28, arg29, arg30, arg31, arg32, arg33, arg34, arg35, arg36, arg37, arg38, arg39, arg40, arg41, arg42);
 }
 
+export function CozePredictStructured(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CozePredictStructured'](arg1, arg2, arg3);
+}
+
 export function FetchKlines(arg1, arg2, arg3) {
   return window['go']['main']['App']['FetchKlines'](arg1, arg2, arg3);
 }
@@ -26,10 +30,22 @@ export function LogBacktestResult(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8
   return window['go']['main']['App']['LogBacktestResult'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13);
 }
 
+export function SetCozeKlineCount(arg1) {
+  return window['go']['main']['App']['SetCozeKlineCount'](arg1);
+}
+
 export function StartBatchTest() {
   return window['go']['main']['App']['StartBatchTest']();
 }
 
+export function StartKlineStream(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartKlineStream'](arg1, arg2, arg3);
+}
+
 export function StopBatchTest() {
   return window['go']['main']['App']['StopBatchTest']();
+}
+
+export function StopKlineStream() {
+  return window['go']['main']['App']['StopKlineStream']();
 }
