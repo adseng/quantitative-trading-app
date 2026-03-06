@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import * as echarts from 'echarts'
 
 import type { KLine } from '../types'
@@ -17,6 +17,45 @@ function formatVolume(value: number): string {
   if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`
   if (value >= 1e3) return `${(value / 1e3).toFixed(3)}K`
   return value.toFixed(2)
+}
+
+function formatTimeOnly(timestamp: number): string {
+  const date = new Date(timestamp)
+  const hour = date.getHours()
+  const minute = date.getMinutes()
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+}
+
+function formatDateOnly(timestamp: number): string {
+  const date = new Date(timestamp)
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${month}/${day}`
+}
+
+function formatDateTime(timestamp: number): string {
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  const hour = `${date.getHours()}`.padStart(2, '0')
+  const minute = `${date.getMinutes()}`.padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
+function formatXAxisLabel(klines: KLine[], index: number): string {
+  const current = klines[index]
+  if (!current) return ''
+  if (index === 0) return formatTimeOnly(current.openTime)
+  const previous = klines[index - 1]
+  if (!previous) return formatTimeOnly(current.openTime)
+  const currentDate = new Date(current.openTime)
+  const prevDate = new Date(previous.openTime)
+  const dayChanged =
+    currentDate.getFullYear() !== prevDate.getFullYear() ||
+    currentDate.getMonth() !== prevDate.getMonth() ||
+    currentDate.getDate() !== prevDate.getDate()
+  return dayChanged ? formatDateOnly(current.openTime) : formatTimeOnly(current.openTime)
 }
 
 function calcMA(period: number, data: KLine[]) {
@@ -61,31 +100,76 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
   const chartUpdateTimeoutRef = useRef<number | null>(null)
   const lastChartUpdateRef = useRef(0)
   const fromThrottleRef = useRef(false)
+  const isHoveringRef = useRef(false)
+  const pendingRefreshRef = useRef(false)
+  const hoveredDataIndexRef = useRef<number | null>(null)
+  const chartDataRef = useRef<ReturnType<typeof buildChartData> | null>(null)
+  const klinesRef = useRef<KLine[]>([])
+  const updateAxisPointerHandlerRef = useRef<((event: any) => void) | null>(null)
+  const dataZoomHandlerRef = useRef<((event: any) => void) | null>(null)
+  const globalOutHandlerRef = useRef<(() => void) | null>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [chartUpdateTrigger, setChartUpdateTrigger] = useState(0)
 
-  const chartData = useMemo(() => {
-    const times = klines.map((item) => new Date(item.openTime).toISOString().slice(0, 16).replace('T', ' '))
-    const values = klines.map((item) => [item.open, item.close, item.low, item.high])
-    const volumes = klines.map((item) => item.volume ?? 0)
-    return {
-      times,
-      values,
-      volumes,
-      ma7: calcMA(7, klines),
-      ma25: calcMA(25, klines),
-      ma99: calcMA(99, klines),
-      volMA5: calcVolMA(5, klines),
-      volMA10: calcVolMA(10, klines),
-    }
-  }, [klines])
+  const chartData = useMemo(() => buildChartData(klines), [klines])
+  chartDataRef.current = chartData
+  klinesRef.current = klines
+  const displayIndex =
+    hoveredIndex != null && hoveredIndex >= 0 && hoveredIndex < klines.length ? hoveredIndex : Math.max(klines.length - 1, 0)
+  const displayMetrics = useMemo(() => getDisplayMetrics(klines, chartData, displayIndex), [chartData, displayIndex, klines])
 
   useEffect(() => {
     dataZoomRef.current = null
   }, [visibleBars])
 
+  const flushPendingRefresh = () => {
+    if (!pendingRefreshRef.current) return
+    pendingRefreshRef.current = false
+    fromThrottleRef.current = true
+    setChartUpdateTrigger((value) => value + 1)
+  }
+
   useEffect(() => {
     if (klines.length === 0 || !chartRef.current) return
     if (!chartInstance.current) chartInstance.current = echarts.init(chartRef.current)
+
+    const chart = chartInstance.current
+    if (!updateAxisPointerHandlerRef.current) {
+      updateAxisPointerHandlerRef.current = (event: any) => {
+        const nextIndex = resolveDataIndex(event, chartDataRef.current?.times ?? [])
+        if (nextIndex == null) return
+        hoveredDataIndexRef.current = nextIndex
+        isHoveringRef.current = true
+        setHoveredIndex((current) => (current === nextIndex ? current : nextIndex))
+      }
+      chart.on('updateAxisPointer', updateAxisPointerHandlerRef.current)
+    }
+    if (!dataZoomHandlerRef.current) {
+      dataZoomHandlerRef.current = (event: any) => {
+        const payload = Array.isArray(event?.batch) ? event.batch[0] : event
+        const start = Number(payload?.start)
+        const end = Number(payload?.end)
+        if (Number.isFinite(start) && Number.isFinite(end)) {
+          dataZoomRef.current = { start, end }
+        }
+      }
+      chart.on('datazoom', dataZoomHandlerRef.current)
+    }
+    if (!globalOutHandlerRef.current) {
+      globalOutHandlerRef.current = () => {
+        hoveredDataIndexRef.current = null
+        isHoveringRef.current = false
+        chart.dispatchAction({ type: 'hideTip' })
+        setHoveredIndex(null)
+        flushPendingRefresh()
+      }
+      chart.getZr().on('globalout', globalOutHandlerRef.current)
+    }
+
+    if (streaming && isHoveringRef.current) {
+      pendingRefreshRef.current = true
+      return
+    }
 
     const throttleMs = 800
     const elapsed = Date.now() - lastChartUpdateRef.current
@@ -109,15 +193,8 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
 
     renderRaf.current = requestAnimationFrame(() => {
       const { times, values, volumes, ma7, ma25, ma99, volMA5, volMA10 } = chartData
-      const last = klines[klines.length - 1]
-      const lastPrice = last?.close ?? 0
-      const priceDigits = lastPrice < 1 ? 6 : lastPrice < 100 ? 4 : 2
-      const lastOpen = last?.open ?? 0
-      const lastChange = lastOpen ? ((lastPrice - lastOpen) / lastOpen) * 100 : 0
-      const lastChangeColor = lastPrice >= lastOpen ? upColor : downColor
-      const lastMA7 = typeof ma7[ma7.length - 1] === 'number' ? (ma7[ma7.length - 1] as number) : null
-      const lastMA25 = typeof ma25[ma25.length - 1] === 'number' ? (ma25[ma25.length - 1] as number) : null
-      const lastMA99 = typeof ma99[ma99.length - 1] === 'number' ? (ma99[ma99.length - 1] as number) : null
+      const latestMetrics = getDisplayMetrics(klines, chartData, Math.max(klines.length - 1, 0))
+      const priceDigits = latestMetrics.priceDigits
 
       const bars = Math.max(1, visibleBars)
       const defaultZoomStart = klines.length <= bars ? 0 : 100 - (bars / klines.length) * 100
@@ -142,12 +219,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
       const isFirstRender = lastChartUpdateRef.current === 0
 
       const formatTimeLabel = (index: number) => {
-        const timestamp = klines[index]?.openTime
-        if (timestamp == null) return ''
-        const date = new Date(timestamp)
-        const hour = date.getUTCHours()
-        const minute = date.getUTCMinutes()
-        return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+        return formatXAxisLabel(klines, index)
       }
 
       chartInstance.current?.setOption(
@@ -155,47 +227,44 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
           backgroundColor: '#0b0e11',
           animation: false,
           axisPointer: {
+            show: true,
             link: [{ xAxisIndex: 'all' }],
-            label: { backgroundColor: '#2b3139' },
-          },
-          tooltip: {
-            trigger: 'axis',
-            axisPointer: { type: 'cross' },
-            backgroundColor: 'rgba(18, 22, 28, 0.92)',
-            borderColor: '#2b3139',
-            textStyle: { color: '#eaecef' },
-            extraCssText: 'box-shadow: 0 2px 10px rgba(0,0,0,0.35);',
-            formatter: (params: any[]) => {
-              const point = params?.find((item) => item?.seriesType === 'candlestick') ?? params?.[0]
-              const index = point?.dataIndex
-              if (index == null || !klines[index]) return ''
-              const current = klines[index]
-              const open = current.open ?? 0
-              const close = current.close ?? 0
-              const high = current.high ?? 0
-              const low = current.low ?? 0
-              const volume = current.volume ?? 0
-              const change = open ? ((close - open) / open) * 100 : 0
-              const amplitude = open ? ((high - low) / open) * 100 : 0
-              const color = close >= open ? upColor : downColor
-              const timeText = times[index].replace(/-/g, '/')
-              const lines: string[] = [
-                `<div style="font-weight:600;margin-bottom:6px;">${timeText}</div>`,
-                `开 ${formatPrice(open)}  高 ${formatPrice(high)}`,
-                `低 ${formatPrice(low)}  收 <span style="color:${color};font-weight:600">${formatPrice(close)}</span>`,
-                `涨跌幅 <span style="color:${color};font-weight:600">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span>  振幅 ${amplitude.toFixed(2)}%`,
-                `MA(7) <span style="color:#f0b90b">${ma7[index] != null ? formatPrice(ma7[index] as number) : '-'}</span>  MA(25) <span style="color:#c994ff">${ma25[index] != null ? formatPrice(ma25[index] as number) : '-'}</span>  MA(99) <span style="color:#a78bfa">${ma99[index] != null ? formatPrice(ma99[index] as number) : '-'}</span>`,
-                `Vol(BTC) ${formatVolume(volume)}  Vol(USDT) ${formatVolume(volume * close)}`,
-              ]
-              if (volMA5[index] != null || volMA10[index] != null) {
-                lines.push(`Vol MA5 ${formatVolume((volMA5[index] as number) ?? 0)}  Vol MA10 ${formatVolume((volMA10[index] as number) ?? 0)}`)
-              }
-              return lines.join('<br/>')
+            label: {
+              backgroundColor: '#2b3139',
+              color: '#eaecef',
+              borderRadius: 2,
+              padding: [3, 6],
+            },
+            lineStyle: {
+              color: '#6b7280',
+              type: 'dashed',
+              width: 1,
+              opacity: 0.9,
             },
           },
+          tooltip: {
+            show: true,
+            trigger: 'axis',
+            triggerOn: 'mousemove|click',
+            formatter: (params: any) => {
+              const nextIndex = resolveDataIndex(params, chartData.times)
+              if (nextIndex != null) {
+                hoveredDataIndexRef.current = nextIndex
+                isHoveringRef.current = true
+                setHoveredIndex((current) => (current === nextIndex ? current : nextIndex))
+              }
+              return ''
+            },
+            backgroundColor: 'transparent',
+            borderWidth: 0,
+            padding: 0,
+            textStyle: { color: 'transparent', fontSize: 0 },
+            extraCssText: 'box-shadow:none;',
+            axisPointer: { type: 'cross' },
+          },
           grid: [
-            { left: 54, right: 72, top: 44, height: 334 },
-            { left: 54, right: 72, top: 392, height: 90 },
+            { left: 54, right: 72, top: 38, height: 348 },
+            { left: 54, right: 72, top: 402, height: 82 },
           ],
           xAxis: [
             {
@@ -204,9 +273,17 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
               boundaryGap: true,
               axisLine: { lineStyle: { color: '#2b3139' } },
               axisLabel: {
-                color: '#848e9c',
-                hideOverlap: true,
-                formatter: (_value: string, index: number) => formatTimeLabel(index),
+                show: false,
+              },
+              splitNumber: 7,
+              axisPointer: {
+                label: {
+                  formatter: (params: any) => {
+                    const index = resolveDataIndex({ axesInfo: [params] }, times)
+                    if (index == null) return ''
+                    return formatDateTime(klines[index]?.openTime ?? 0)
+                  },
+                },
               },
               splitLine: { show: false },
               axisTick: { show: false },
@@ -219,7 +296,13 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
               data: times,
               boundaryGap: true,
               axisLine: { lineStyle: { color: '#2b3139' } },
-              axisLabel: { show: false },
+              axisLabel: {
+                color: '#848e9c',
+                fontSize: 11,
+                hideOverlap: true,
+                margin: 14,
+                formatter: (_value: string, index: number) => formatTimeLabel(index),
+              },
               splitLine: { show: false },
               axisTick: { show: false },
               min: 'dataMin',
@@ -231,8 +314,13 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
               scale: true,
               position: 'right',
               axisLine: { lineStyle: { color: '#2b3139' } },
-              axisLabel: { color: '#848e9c', formatter: (value: number) => Number(value).toFixed(priceDigits) },
-              splitLine: { lineStyle: { color: '#1e2329' } },
+              axisLabel: { color: '#848e9c', fontSize: 11, formatter: (value: number) => Number(value).toFixed(priceDigits) },
+              axisPointer: {
+                label: {
+                  formatter: ({ value }: { value: number }) => formatPrice(Number(value), priceDigits),
+                },
+              },
+              splitLine: { lineStyle: { color: '#1b1f27', width: 1 } },
             },
             {
               gridIndex: 1,
@@ -241,6 +329,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
               axisLine: { lineStyle: { color: '#2b3139' } },
               axisLabel: {
                 color: '#848e9c',
+                fontSize: 11,
                 formatter: (value: number) => (value >= 1e6 ? `${(value / 1e6).toFixed(1)}M` : value >= 1e3 ? `${(value / 1e3).toFixed(1)}K` : `${Math.round(value)}`),
               },
               splitLine: { show: false },
@@ -252,122 +341,19 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
               type: 'slider',
               xAxisIndex: [0, 1],
               bottom: 8,
-              height: 22,
+              height: 18,
               start,
               end,
               brushSelect: false,
-              fillerColor: 'rgba(132, 142, 156, 0.15)',
+              fillerColor: 'rgba(132, 142, 156, 0.12)',
               borderColor: '#2b3139',
-              handleStyle: { color: '#2b3139' },
-              textStyle: { color: '#848e9c' },
+              handleStyle: { color: '#6b7280', borderColor: '#6b7280' },
+              moveHandleStyle: { color: '#6b7280' },
+              textStyle: { color: '#6b7280', fontSize: 10 },
             },
           ],
           graphic: [
-            {
-              type: 'text',
-              left: 'center',
-              top: 150,
-              style: {
-                text: 'BINANCE',
-                fontSize: 42,
-                fontWeight: 700,
-                fill: 'rgba(132, 142, 156, 0.08)',
-              },
-              silent: true,
-            },
-            {
-              type: 'group',
-              left: 54,
-              top: 14,
-              silent: true,
-              children: [
-                {
-                  type: 'text',
-                  left: 0,
-                  top: 0,
-                  style: {
-                    text: `开 ${formatPrice(lastOpen)}  高 ${formatPrice(last?.high ?? 0)}  低 ${formatPrice(last?.low ?? 0)}  收 ${formatPrice(lastPrice)}`,
-                    fill: '#eaecef',
-                    fontSize: 12,
-                    fontWeight: 500,
-                  },
-                },
-                {
-                  type: 'text',
-                  left: 0,
-                  top: 18,
-                  style: {
-                    text: `涨跌幅 ${lastChange >= 0 ? '+' : ''}${lastChange.toFixed(2)}%  振幅 ${lastOpen ? ((((last?.high ?? 0) - (last?.low ?? 0)) / lastOpen) * 100).toFixed(2) : '0'}%`,
-                    fill: lastChangeColor,
-                    fontSize: 12,
-                    fontWeight: 500,
-                  },
-                },
-                {
-                  type: 'text',
-                  left: 0,
-                  top: 36,
-                  style: {
-                    text: `MA(7) ${lastMA7 != null ? formatPrice(lastMA7) : '-'}`,
-                    fill: '#f0b90b',
-                    fontSize: 12,
-                    fontWeight: 500,
-                  },
-                },
-                {
-                  type: 'text',
-                  left: 120,
-                  top: 36,
-                  style: {
-                    text: `MA(25) ${lastMA25 != null ? formatPrice(lastMA25) : '-'}`,
-                    fill: '#c994ff',
-                    fontSize: 12,
-                    fontWeight: 500,
-                  },
-                },
-                {
-                  type: 'text',
-                  left: 255,
-                  top: 36,
-                  style: {
-                    text: `MA(99) ${lastMA99 != null ? formatPrice(lastMA99) : '-'}`,
-                    fill: '#a78bfa',
-                    fontSize: 12,
-                    fontWeight: 500,
-                  },
-                },
-                {
-                  type: 'text',
-                  left: 0,
-                  top: 54,
-                  style: {
-                    text: `最新 ${formatPrice(lastPrice)}  (${lastChange >= 0 ? '+' : ''}${lastChange.toFixed(2)}%)`,
-                    fill: lastChangeColor,
-                    fontSize: 12,
-                    fontWeight: 600,
-                  },
-                },
-              ],
-            },
-            {
-              type: 'group',
-              left: 54,
-              top: 398,
-              silent: true,
-              children: [
-                {
-                  type: 'text',
-                  left: 0,
-                  top: 0,
-                  style: {
-                    text: `Vol(BTC) ${formatVolume(last?.volume ?? 0)}  Vol(USDT) ${formatVolume((last?.volume ?? 0) * (last?.close ?? 0))}`,
-                    fill: '#848e9c',
-                    fontSize: 12,
-                    fontWeight: 500,
-                  },
-                },
-              ],
-            },
+            buildWatermarkGraphic(),
           ],
           series: [
             {
@@ -384,14 +370,15 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
                 symbol: ['none', 'none'],
                 label: {
                   show: true,
-                  formatter: () => `${lastPrice.toFixed(priceDigits)}`,
-                  color: '#eaecef',
-                  backgroundColor: '#2b3139',
+                  formatter: () => `${(klines[klines.length - 1]?.close ?? 0).toFixed(priceDigits)}`,
+                  color: '#ffffff',
+                  backgroundColor: (klines[klines.length - 1]?.close ?? 0) >= (klines[klines.length - 1]?.open ?? 0) ? upColor : downColor,
                   padding: [3, 6],
                   borderRadius: 3,
+                  distance: 6,
                 },
-                lineStyle: { color: '#848e9c', type: 'dashed', width: 1, opacity: 0.8 },
-                data: [{ yAxis: lastPrice }],
+                lineStyle: { color: '#848e9c', type: 'dashed', width: 1, opacity: 0.5 },
+                data: [{ yAxis: klines[klines.length - 1]?.close ?? 0 }],
               },
             },
             {
@@ -467,7 +454,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
             },
           ],
         },
-        !isFirstRender,
+        false,
       )
 
       chartInstance.current?.resize()
@@ -489,23 +476,175 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
     window.addEventListener('resize', onResize)
     return () => {
       if (renderRaf.current) cancelAnimationFrame(renderRaf.current)
+      if (chart && updateAxisPointerHandlerRef.current) {
+        chart.off('updateAxisPointer', updateAxisPointerHandlerRef.current)
+      }
+      if (chart && dataZoomHandlerRef.current) {
+        chart.off('datazoom', dataZoomHandlerRef.current)
+      }
+      if (chart && globalOutHandlerRef.current) {
+        chart.getZr().off('globalout', globalOutHandlerRef.current)
+      }
       window.removeEventListener('resize', onResize)
       chart?.dispose()
       chartInstance.current = null
+      updateAxisPointerHandlerRef.current = null
+      dataZoomHandlerRef.current = null
+      globalOutHandlerRef.current = null
     }
   }, [])
 
   return (
     <div
-      ref={chartRef}
       style={{
+        position: 'relative',
         width: '100%',
         minHeight: 520,
         height: 520,
         background: '#0b0e11',
         border: '1px solid #1e2329',
         borderRadius: 6,
+        overflow: 'hidden',
       }}
-    />
+    >
+      <div style={overlayRowStyle(8, 54)}>
+        <span style={textStyle('#848e9c', 400)}>{displayMetrics.timeText}</span>
+        <span style={textStyle('#eaecef')}>{`开 ${formatPrice(displayMetrics.open, displayMetrics.priceDigits)}`}</span>
+        <span style={textStyle('#eaecef')}>{`高 ${formatPrice(displayMetrics.high, displayMetrics.priceDigits)}`}</span>
+        <span style={textStyle('#eaecef')}>{`低 ${formatPrice(displayMetrics.low, displayMetrics.priceDigits)}`}</span>
+        <span style={textStyle(displayMetrics.changeColor, 600)}>{`收 ${formatPrice(displayMetrics.close, displayMetrics.priceDigits)}`}</span>
+        <span style={textStyle(displayMetrics.changeColor, 600)}>{`涨跌 ${displayMetrics.change >= 0 ? '+' : ''}${displayMetrics.change.toFixed(2)}%`}</span>
+        <span style={textStyle('#848e9c')}>{`振幅 ${displayMetrics.amplitude.toFixed(2)}%`}</span>
+      </div>
+      <div style={overlayRowStyle(24, 54)}>
+        <span style={textStyle('#f0b90b')}>{`MA(7) ${displayMetrics.ma7 != null ? formatPrice(displayMetrics.ma7, displayMetrics.priceDigits) : '-'}`}</span>
+        <span style={textStyle('#d946ef')}>{`MA(25) ${displayMetrics.ma25 != null ? formatPrice(displayMetrics.ma25, displayMetrics.priceDigits) : '-'}`}</span>
+        <span style={textStyle('#7c3aed')}>{`MA(99) ${displayMetrics.ma99 != null ? formatPrice(displayMetrics.ma99, displayMetrics.priceDigits) : '-'}`}</span>
+      </div>
+      <div style={overlayRowStyle(398, 54)}>
+        <span style={textStyle('#848e9c')}>{`Vol(BTC) ${formatVolume(displayMetrics.volume)}`}</span>
+        <span style={textStyle('#848e9c')}>{`Vol(USDT) ${formatVolume(displayMetrics.volume * displayMetrics.close)}`}</span>
+        <span style={textStyle('#38bdf8')}>{`MA5 ${displayMetrics.volMA5 != null ? formatVolume(displayMetrics.volMA5) : '-'}`}</span>
+        <span style={textStyle('#fb7185')}>{`MA10 ${displayMetrics.volMA10 != null ? formatVolume(displayMetrics.volMA10) : '-'}`}</span>
+      </div>
+      <div
+        ref={chartRef}
+        style={{
+          width: '100%',
+          height: '100%',
+        }}
+      />
+    </div>
   )
+}
+
+function buildChartData(klines: KLine[]) {
+    const times = klines.map((item) => new Date(item.openTime).toISOString().slice(0, 16).replace('T', ' '))
+    const values = klines.map((item) => [item.open, item.close, item.low, item.high])
+    const volumes = klines.map((item) => item.volume ?? 0)
+    return {
+      times,
+      values,
+      volumes,
+      ma7: calcMA(7, klines),
+      ma25: calcMA(25, klines),
+      ma99: calcMA(99, klines),
+      volMA5: calcVolMA(5, klines),
+      volMA10: calcVolMA(10, klines),
+    }
+}
+
+function getDisplayMetrics(klines: KLine[], chartData: ReturnType<typeof buildChartData>, index: number) {
+  const current = klines[index] ?? klines[klines.length - 1]
+  const open = current?.open ?? 0
+  const close = current?.close ?? 0
+  const high = current?.high ?? 0
+  const low = current?.low ?? 0
+  const volume = current?.volume ?? 0
+  const change = open ? ((close - open) / open) * 100 : 0
+  const amplitude = open ? ((high - low) / open) * 100 : 0
+  const changeColor = close >= open ? upColor : downColor
+  const priceDigits = close < 1 ? 6 : close < 100 ? 4 : 2
+  const timeText = chartData.times[index]?.replace(/-/g, '/') ?? ''
+  const ma7 = chartData.ma7[index]
+  const ma25 = chartData.ma25[index]
+  const ma99 = chartData.ma99[index]
+  const volMA5 = chartData.volMA5[index]
+  const volMA10 = chartData.volMA10[index]
+
+  return {
+    timeText,
+    open,
+    close,
+    high,
+    low,
+    volume,
+    change,
+    amplitude,
+    changeColor,
+    priceDigits,
+    ma7,
+    ma25,
+    ma99,
+    volMA5,
+    volMA10,
+  }
+}
+
+function buildWatermarkGraphic() {
+  return {
+    id: 'watermark',
+    type: 'text',
+    left: 'center',
+    top: 150,
+    style: {
+      text: 'BINANCE',
+      fontSize: 42,
+      fontWeight: 700,
+      fill: 'rgba(132, 142, 156, 0.08)',
+    },
+    silent: true,
+  }
+}
+
+function overlayRowStyle(top: number, left: number): CSSProperties {
+  return {
+    position: 'absolute',
+    top,
+    left,
+    right: 72,
+    display: 'flex',
+    gap: 16,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    pointerEvents: 'none',
+    zIndex: 2,
+  }
+}
+
+function textStyle(color: string, fontWeight: number = 500): CSSProperties {
+  return {
+    color,
+    fontSize: 11,
+    fontWeight,
+    lineHeight: '16px',
+    whiteSpace: 'nowrap',
+  }
+}
+
+function resolveDataIndex(event: any, times: string[]): number | null {
+  const tooltipParams = Array.isArray(event) ? event : null
+  const firstSeries = tooltipParams?.find((item: any) => typeof item?.dataIndex === 'number')
+  if (typeof firstSeries?.dataIndex === 'number') return firstSeries.dataIndex
+
+  const seriesData = Array.isArray(event?.seriesData) ? event.seriesData : null
+  const firstSeriesData = seriesData?.find((item: any) => typeof item?.dataIndex === 'number')
+  if (typeof firstSeriesData?.dataIndex === 'number') return firstSeriesData.dataIndex
+
+  const axisInfo = event?.axesInfo?.[0]
+  if (!axisInfo) return null
+  if (typeof axisInfo.value === 'number') return axisInfo.value
+  const value = String(axisInfo.value ?? '')
+  const index = times.indexOf(value)
+  return index >= 0 ? index : null
 }
