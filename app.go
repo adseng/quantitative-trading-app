@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
 
 	"quantitative-trading-app/internal/backtestlog"
 	"quantitative-trading-app/internal/batchtest"
@@ -22,22 +20,13 @@ type App struct {
 	batchRunner  *batchtest.BatchRunner
 	cancelFetch  chan struct{}
 	cachedKlines []*factor.KLine // 缓存已获取的 K 线，resume 时复用
-
-	// Coze 预测页：K 线流（REST 轮询，每 100ms 拉最新 1 根）
-	klineStream        *binance.KlineStream
-	klinePollStop      chan struct{}
-	klineBuf           []*factor.KLine
-	klineBufMu         sync.Mutex
-	klineSymbol        string
-	klineInterval      string
-	klineLimit         int64
-	cozeKlineCount int // 发给豆包的 K 线根数，默认 50
+	cozeService  *coze.Service
 }
 
 func NewApp() *App {
 	return &App{
-		batchRunner:    batchtest.NewBatchRunner(),
-		cozeKlineCount: 50,
+		batchRunner: batchtest.NewBatchRunner(),
+		cozeService: coze.NewService(),
 	}
 }
 
@@ -45,19 +34,14 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	_ = config.Load()
 	binance.InitClient()
+	a.cozeService.BindRuntime(ctx, func(eventName string, payload any) {
+		wailsRuntime.EventsEmit(ctx, eventName, payload)
+	})
 }
 
 // FetchKlines 从币安合约获取 K 线数据，按时间升序返回。
 func (a *App) FetchKlines(symbol, interval string, limit int64) ([]factor.KLine, error) {
-	kl, err := binance.FetchKlines(symbol, interval, limit, nil)
-	if err != nil || kl == nil {
-		return nil, err
-	}
-	out := make([]factor.KLine, len(kl))
-	for i, k := range kl {
-		out[i] = *k
-	}
-	return out, nil
+	return a.cozeService.FetchKlines(symbol, interval, limit)
 }
 
 // BacktestEmotion 使用基础因子配置进行回测。
@@ -102,7 +86,7 @@ func (a *App) BacktestEmotionV2(klines []factor.KLine,
 		UseVolume: useVolume, VolumePeriod: volumePeriod, VolumeWeight: volumeWeight,
 		UseSession: useSession, SessionWeight: sessionWeight,
 		UseMACross: useMACross, MACrossShort: macrossShort, MACrossLong: macrossLong, MACrossWeight: macrossWeight,
-			MACrossWindow: macrossWindow, MACrossPreempt: macrossPreempt,
+		MACrossWindow: macrossWindow, MACrossPreempt: macrossPreempt,
 	}
 	minLen := cfg.MinHistory()
 	if len(klines) < minLen {
@@ -164,7 +148,7 @@ func (a *App) StartBatchTest() error {
 
 		klines, err := binance.FetchKlines("BTCUSDT", "15m", 0, &binance.FetchKlinesOpts{
 			PerReq:  1000,
-			Chunks: 100,
+			Chunks:  100,
 			DelayMs: 600,
 			ProgressFn: func(round, totalRounds, fetched int) {
 				emit(batchtest.ProgressEvent{
@@ -220,210 +204,14 @@ func (a *App) GetBatchTestResults(maxN int) []cases.TestResult {
 	return a.batchRunner.GetLastResults(maxN)
 }
 
-// intervalMs 返回周期毫秒数，用于判断 K 线是否连续
-func intervalMs(interval string) int64 {
-	switch interval {
-	case "1m":
-		return 60 * 1000
-	case "3m":
-		return 3 * 60 * 1000
-	case "5m":
-		return 5 * 60 * 1000
-	case "15m":
-		return 15 * 60 * 1000
-	case "30m":
-		return 30 * 60 * 1000
-	case "1h":
-		return 60 * 60 * 1000
-	case "4h":
-		return 4 * 60 * 60 * 1000
-	case "1d":
-		return 24 * 60 * 60 * 1000
-	default:
-		return 15 * 60 * 1000
-	}
-}
-
-// StartKlineStream 获取 limit 根 K 线，启动 REST 轮询（每 100ms 拉最新 1 根）。
-// 若最新 1 根与当前不连续则重新拉取 limit 根。事件: kline:snapshot, kline:update, kline:status
 func (a *App) StartKlineStream(symbol, interval string, limit int64) error {
-	if symbol == "" {
-		symbol = "BTCUSDT"
-	}
-	if interval == "" {
-		interval = "15m"
-	}
-	if limit <= 0 {
-		limit = 1000
-	}
-	if limit > 1500 {
-		limit = 1500
-	}
-	a.StopKlineStream()
-
-	klines, err := binance.FetchKlines(symbol, interval, limit, nil)
-	if err != nil {
-		return err
-	}
-	if len(klines) == 0 {
-		return fmt.Errorf("未获取到 K 线")
-	}
-
-	a.klineBufMu.Lock()
-	a.klineBuf = klines
-	a.klineSymbol = symbol
-	a.klineInterval = interval
-	a.klineLimit = limit
-	a.klineBufMu.Unlock()
-
-	snapshot := make([]factor.KLine, len(klines))
-	for i, k := range klines {
-		snapshot[i] = *k
-	}
-	wailsRuntime.EventsEmit(a.ctx, "kline:snapshot", map[string]interface{}{
-		"klines":   snapshot,
-		"symbol":   symbol,
-		"interval": interval,
-	})
-	wailsRuntime.EventsEmit(a.ctx, "kline:status", map[string]interface{}{"status": "polling"})
-
-	a.klinePollStop = make(chan struct{})
-	go a.runKlinePoll()
-	return nil
+	return a.cozeService.StartKlineStream(symbol, interval, limit)
 }
 
-func (a *App) runKlinePoll() {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-a.klinePollStop:
-			return
-		case <-ticker.C:
-			a.klineBufMu.Lock()
-			symbol := a.klineSymbol
-			interval := a.klineInterval
-			buf := a.klineBuf
-			a.klineBufMu.Unlock()
-			if symbol == "" || len(buf) == 0 {
-				continue
-			}
-			latest, err := binance.FetchKlines(symbol, interval, 1, nil)
-			if err != nil || len(latest) == 0 {
-				continue
-			}
-			kl := latest[0]
-			lastOpen := buf[len(buf)-1].OpenTime
-			ms := intervalMs(interval)
-			a.klineBufMu.Lock()
-			buf = a.klineBuf
-			a.klineBufMu.Unlock()
-			if kl.OpenTime == lastOpen {
-				// 更新最后一根
-				a.klineBufMu.Lock()
-				for i := range a.klineBuf {
-					if a.klineBuf[i].OpenTime == kl.OpenTime {
-						a.klineBuf[i] = kl
-						break
-					}
-				}
-				a.klineBufMu.Unlock()
-				payload := map[string]interface{}{
-					"openTime":  kl.OpenTime, "closeTime": kl.CloseTime,
-					"open": kl.Open, "high": kl.High, "low": kl.Low, "close": kl.Close, "volume": kl.Volume,
-				}
-				wailsRuntime.EventsEmit(a.ctx, "kline:update", payload)
-			} else if kl.OpenTime == lastOpen+ms {
-				// 下一根，追加
-				a.klineBufMu.Lock()
-				a.klineBuf = append(a.klineBuf, kl)
-				cap := int(a.klineLimit)
-				if cap <= 0 {
-					cap = 1000
-				}
-				if len(a.klineBuf) > cap {
-					a.klineBuf = a.klineBuf[len(a.klineBuf)-cap:]
-				}
-				a.klineBufMu.Unlock()
-				payload := map[string]interface{}{
-					"openTime":  kl.OpenTime, "closeTime": kl.CloseTime,
-					"open": kl.Open, "high": kl.High, "low": kl.Low, "close": kl.Close, "volume": kl.Volume,
-				}
-				wailsRuntime.EventsEmit(a.ctx, "kline:update", payload)
-			} else {
-				// 不连续，重新拉 limit 根
-				a.klineBufMu.Lock()
-				limit := a.klineLimit
-				a.klineBufMu.Unlock()
-				if limit <= 0 {
-					limit = 1000
-				}
-				full, err := binance.FetchKlines(symbol, interval, limit, nil)
-				if err != nil || len(full) == 0 {
-					continue
-				}
-				a.klineBufMu.Lock()
-				a.klineBuf = full
-				a.klineBufMu.Unlock()
-				snap := make([]factor.KLine, len(full))
-				for i, k := range full {
-					snap[i] = *k
-				}
-				wailsRuntime.EventsEmit(a.ctx, "kline:snapshot", map[string]interface{}{
-					"klines": snap, "symbol": symbol, "interval": interval,
-				})
-			}
-		}
-	}
-}
-
-// StopKlineStream 停止 K 线轮询，并通知前端状态为已停止
 func (a *App) StopKlineStream() {
-	if a.klinePollStop != nil {
-		select {
-		case <-a.klinePollStop:
-		default:
-			close(a.klinePollStop)
-		}
-		a.klinePollStop = nil
-	}
-	if a.klineStream != nil {
-		a.klineStream.Stop()
-		a.klineStream = nil
-	}
-	wailsRuntime.EventsEmit(a.ctx, "kline:status", map[string]interface{}{"status": "stopped"})
+	a.cozeService.StopKlineStream()
 }
 
-// SetCozeKlineCount 设置发给豆包的 K 线根数（定时预测与手动预测均使用），默认 50
-func (a *App) SetCozeKlineCount(count int) {
-	a.klineBufMu.Lock()
-	defer a.klineBufMu.Unlock()
-	if count <= 0 {
-		count = 50
-	}
-	a.cozeKlineCount = count
+func (a *App) CozePredictStructured(symbol, interval string, count int) (*coze.CozeStructuredResult, error) {
+	return a.cozeService.PredictStructured(symbol, interval, count)
 }
-
-// emitCozeStatus / emitCozeResult 供 coze 包回调，推送状态与结果到前端
-func (a *App) emitCozeStatus(status, message string) {
-	wailsRuntime.EventsEmit(a.ctx, "coze:status", map[string]interface{}{"status": status, "message": message})
-}
-func (a *App) emitCozeResult(res *coze.CozeStructuredResult) {
-	wailsRuntime.EventsEmit(a.ctx, "coze:result", res)
-}
-
-// CozePredictStructured 手动调用 Coze 结构化预测（传入当前 K 线，count 为发给豆包的 K 线根数，≤0 用 50）
-func (a *App) CozePredictStructured(klines []factor.KLine, symbol string, count int) (*coze.CozeStructuredResult, error) {
-	if symbol == "" {
-		symbol = "BTCUSDT"
-	}
-	if count <= 0 {
-		count = 50
-	}
-	ptr := make([]*factor.KLine, len(klines))
-	for i := range klines {
-		ptr[i] = &klines[i]
-	}
-	return coze.PredictStructuredWithNotify(a.ctx, ptr, symbol, count, a.emitCozeStatus, a.emitCozeResult)
-}
-

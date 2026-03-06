@@ -30,10 +30,6 @@ export function LogBacktestResult(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8
   return window['go']['main']['App']['LogBacktestResult'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13);
 }
 
-export function SetCozeKlineCount(arg1) {
-  return window['go']['main']['App']['SetCozeKlineCount'](arg1);
-}
-
 export function StartBatchTest() {
   return window['go']['main']['App']['StartBatchTest']();
 }

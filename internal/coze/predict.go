@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coze-dev/coze-go"
@@ -29,6 +31,11 @@ const (
 	KlineInterval = "15m"
 )
 
+var (
+	excelRecordOnce sync.Once
+	excelRecordCh   chan *CozeStructuredResult
+)
+
 // PredictResult 预测结果
 type PredictResult struct {
 	Answer   string
@@ -42,7 +49,9 @@ type CozeStructuredResult struct {
 	CurrentPrice    float64        `json:"current_price"`
 	MarketStructure string         `json:"market_structure"`
 	Scenarios       []CozeScenario `json:"scenarios"`
-	RawAnswer       string         `json:"-"` // 解析失败时保留原始回复
+	RawAnswer       string         `json:"rawAnswer,omitempty"`
+	ParseOK         bool           `json:"parseOk"`
+	ResultType      string         `json:"resultType"`
 }
 
 // CozeScenario 单个场景
@@ -156,6 +165,7 @@ func PredictStructured(ctx context.Context, klines []*factor.KLine, symbol strin
 		n = len(klines)
 	}
 	recent := klines[len(klines)-n:]
+	currentPrice := recent[len(recent)-1].Close
 
 	token := config.Get(config.KeyCozeAPIToken, "")
 	botID := config.Get(config.KeyCozeBotID, "")
@@ -212,15 +222,51 @@ func PredictStructured(ctx context.Context, klines []*factor.KLine, symbol strin
 	}
 	var out CozeStructuredResult
 	if err := json.Unmarshal([]byte(jsonStr), &out); err != nil {
-		return &CozeStructuredResult{RawAnswer: answer}, nil
+		return &CozeStructuredResult{
+			Timestamp:    time.Now().Format("2006-01-02 15:04:05"),
+			Symbol:       symbol,
+			CurrentPrice: currentPrice,
+			RawAnswer:    answer,
+			ParseOK:      false,
+			ResultType:   "raw",
+		}, nil
 	}
+	if out.Timestamp == "" {
+		out.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+	}
+	if out.Symbol == "" {
+		out.Symbol = symbol
+	}
+	if out.CurrentPrice == 0 {
+		out.CurrentPrice = currentPrice
+	}
+	out.ParseOK = true
+	out.ResultType = "structured"
 	return &out, nil
 }
 
-// recordExcelSafe 异步写入 Excel，内部 recover 防止 panic 影响主流程
-func recordExcelSafe(res *CozeStructuredResult) {
-	defer func() { _ = recover() }()
-	_ = AppendResultToExcel(res)
+func enqueueExcelRecord(res *CozeStructuredResult) {
+	if res == nil {
+		return
+	}
+	excelRecordOnce.Do(func() {
+		excelRecordCh = make(chan *CozeStructuredResult, 32)
+		go func() {
+			for item := range excelRecordCh {
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							log.Printf("[coze] write excel panic: %v", r)
+						}
+					}()
+					if err := AppendResultToExcel(item); err != nil {
+						log.Printf("[coze] write excel failed: %v", err)
+					}
+				}()
+			}
+		}()
+	})
+	excelRecordCh <- res
 }
 
 // PredictStructuredWithNotify 调用 PredictStructured，按顺序回调 onStatus（requesting/error/done）与 onResult，并异步写入 Excel；带 recover，回调可为 nil。供 app 层复用。
@@ -256,6 +302,6 @@ func PredictStructuredWithNotify(
 	if onResult != nil {
 		onResult(res)
 	}
-	go recordExcelSafe(res)
+	enqueueExcelRecord(res)
 	return res, nil
 }

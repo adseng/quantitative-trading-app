@@ -16,7 +16,7 @@ import (
 
 const (
 	klineLimit   = 200
-	windowSize   = 25  // 每窗 25 条：20 条给 Coze，5 条验证
+	windowSize   = 25 // 每窗 25 条：20 条给 Coze，5 条验证
 	cozeKlines   = 20
 	verifyKlines = 5
 	windowStep   = 5

@@ -8,7 +8,7 @@ export function BacktestEmotion(arg1:Array<factor.KLine>,arg2:boolean,arg3:boole
 
 export function BacktestEmotionV2(arg1:Array<factor.KLine>,arg2:boolean,arg3:number,arg4:number,arg5:number,arg6:boolean,arg7:number,arg8:number,arg9:boolean,arg10:number,arg11:number,arg12:number,arg13:number,arg14:boolean,arg15:number,arg16:number,arg17:number,arg18:number,arg19:boolean,arg20:number,arg21:number,arg22:number,arg23:boolean,arg24:number,arg25:number,arg26:boolean,arg27:number,arg28:number,arg29:boolean,arg30:number,arg31:number,arg32:boolean,arg33:number,arg34:number,arg35:boolean,arg36:number,arg37:boolean,arg38:number,arg39:number,arg40:number,arg41:number,arg42:number):Promise<factor.BacktestResultSummary>;
 
-export function CozePredictStructured(arg1:Array<factor.KLine>,arg2:string,arg3:number):Promise<coze.CozeStructuredResult>;
+export function CozePredictStructured(arg1:string,arg2:string,arg3:number):Promise<coze.CozeStructuredResult>;
 
 export function FetchKlines(arg1:string,arg2:string,arg3:number):Promise<Array<factor.KLine>>;
 
@@ -17,8 +17,6 @@ export function GetBatchTestProgress():Promise<Record<string, any>>;
 export function GetBatchTestResults(arg1:number):Promise<Array<cases.TestResult>>;
 
 export function LogBacktestResult(arg1:string,arg2:string,arg3:number,arg4:boolean,arg5:boolean,arg6:number,arg7:number,arg8:number,arg9:number,arg10:number,arg11:number,arg12:number,arg13:number):Promise<void>;
-
-export function SetCozeKlineCount(arg1:number):Promise<void>;
 
 export function StartBatchTest():Promise<void>;
 

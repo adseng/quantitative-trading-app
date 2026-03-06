@@ -181,6 +181,9 @@ export namespace coze {
 	    current_price: number;
 	    market_structure: string;
 	    scenarios: CozeScenario[];
+	    rawAnswer?: string;
+	    parseOk: boolean;
+	    resultType: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CozeStructuredResult(source);
@@ -193,6 +196,9 @@ export namespace coze {
 	        this.current_price = source["current_price"];
 	        this.market_structure = source["market_structure"];
 	        this.scenarios = this.convertValues(source["scenarios"], CozeScenario);
+	        this.rawAnswer = source["rawAnswer"];
+	        this.parseOk = source["parseOk"];
+	        this.resultType = source["resultType"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
