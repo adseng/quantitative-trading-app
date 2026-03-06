@@ -111,9 +111,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
   const hoveredDataIndexRef = useRef<number | null>(null)
   const chartDataRef = useRef<ReturnType<typeof buildChartData> | null>(null)
   const klinesRef = useRef<KLine[]>([])
-  const updateAxisPointerHandlerRef = useRef<((event: any) => void) | null>(null)
-  const dataZoomHandlerRef = useRef<((event: any) => void) | null>(null)
-  const globalOutHandlerRef = useRef<(() => void) | null>(null)
+  const priceDigitsRef = useRef(2)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [chartUpdateTrigger, setChartUpdateTrigger] = useState(0)
 
@@ -123,65 +121,306 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
   const displayIndex =
     hoveredIndex != null && hoveredIndex >= 0 && hoveredIndex < klines.length ? hoveredIndex : Math.max(klines.length - 1, 0)
   const displayMetrics = useMemo(() => getDisplayMetrics(klines, chartData, displayIndex), [chartData, displayIndex, klines])
+  const lastCompletedIndex = streaming ? Math.max(klines.length - 2, 0) : Math.max(klines.length - 1, 0)
+  const latestVolMA7 = chartData.volMA7[lastCompletedIndex]
+  const latestVolMA14 = chartData.volMA14[lastCompletedIndex]
 
   useEffect(() => {
     dataZoomRef.current = null
   }, [visibleBars])
 
-  const flushPendingRefresh = () => {
-    if (!pendingRefreshRef.current) return
-    pendingRefreshRef.current = false
-    fromThrottleRef.current = true
-    setChartUpdateTrigger((value) => value + 1)
-  }
-
+  // Static options & event handlers — runs once on mount
   useEffect(() => {
-    if (klines.length === 0 || !chartRef.current) return
-    if (!chartInstance.current) chartInstance.current = echarts.init(chartRef.current)
+    if (!chartRef.current) return
+    const chart = echarts.init(chartRef.current)
+    chartInstance.current = chart
+    lastChartUpdateRef.current = 0
 
-    const chart = chartInstance.current
-    if (!updateAxisPointerHandlerRef.current) {
-      updateAxisPointerHandlerRef.current = (event: any) => {
-        const nextIndex = resolveDataIndex(event, chartDataRef.current?.times ?? [])
-        if (nextIndex == null) return
-        hoveredDataIndexRef.current = nextIndex
-        isHoveringRef.current = true
-        setHoveredIndex((current) => (current === nextIndex ? current : nextIndex))
-      }
-      chart.on('updateAxisPointer', updateAxisPointerHandlerRef.current)
-    }
-    if (!dataZoomHandlerRef.current) {
-      dataZoomHandlerRef.current = (event: any) => {
-        const payload = Array.isArray(event?.batch) ? event.batch[0] : event
-        const start = Number(payload?.start)
-        const end = Number(payload?.end)
-        if (Number.isFinite(start) && Number.isFinite(end)) {
-          dataZoomRef.current = { start, end }
-          return
-        }
-
-        const startValue = Number(payload?.startValue)
-        const endValue = Number(payload?.endValue)
-        const total = klinesRef.current.length
-        if (Number.isFinite(startValue) && Number.isFinite(endValue) && total > 1) {
-          dataZoomRef.current = {
-            start: (startValue / total) * 100,
-            end: ((endValue + 1) / total) * 100,
+    // Formatters read from refs so they always reflect the latest data
+    // without needing to be recreated on every update.
+    chart.setOption({
+      backgroundColor: '#0b0e11',
+      animation: false,
+      axisPointer: {
+        show: true,
+        link: [{ xAxisIndex: 'all' }],
+        label: {
+          backgroundColor: '#2b3139',
+          color: '#eaecef',
+          borderRadius: 2,
+          padding: [3, 6],
+        },
+        lineStyle: {
+          color: '#6b7280',
+          type: 'dashed',
+          width: 1,
+          opacity: 0.9,
+        },
+      },
+      tooltip: {
+        show: true,
+        trigger: 'axis',
+        triggerOn: 'mousemove|click',
+        formatter: (params: any) => {
+          const nextIndex = resolveDataIndex(params, chartDataRef.current?.times ?? [])
+          if (nextIndex != null) {
+            hoveredDataIndexRef.current = nextIndex
+            isHoveringRef.current = true
+            setHoveredIndex((cur) => (cur === nextIndex ? cur : nextIndex))
           }
-        }
+          return ''
+        },
+        backgroundColor: 'transparent',
+        borderWidth: 0,
+        padding: 0,
+        textStyle: { color: 'transparent', fontSize: 0 },
+        extraCssText: 'box-shadow:none;',
+        axisPointer: { type: 'cross' },
+      },
+      grid: [
+        { left: 54, right: 72, top: 38, height: 348 },
+        { left: 54, right: 72, top: 402, height: 82 },
+      ],
+      xAxis: [
+        {
+          type: 'category',
+          data: [],
+          boundaryGap: true,
+          axisLine: { lineStyle: { color: '#2b3139' } },
+          axisLabel: { show: false },
+          splitNumber: 7,
+          axisPointer: {
+            label: {
+              formatter: (params: any) => {
+                const index = resolveDataIndex({ axesInfo: [params] }, chartDataRef.current?.times ?? [])
+                if (index == null) return ''
+                return formatDateTime(klinesRef.current[index]?.openTime ?? 0)
+              },
+            },
+          },
+          splitLine: { show: false },
+          axisTick: { show: false },
+          min: 'dataMin',
+          max: 'dataMax',
+        },
+        {
+          type: 'category',
+          gridIndex: 1,
+          data: [],
+          boundaryGap: true,
+          axisLine: { lineStyle: { color: '#2b3139' } },
+          axisLabel: {
+            color: '#848e9c',
+            fontSize: 11,
+            hideOverlap: true,
+            margin: 14,
+            formatter: (_v: string, index: number) => formatXAxisLabel(klinesRef.current, index),
+          },
+          splitLine: { show: false },
+          axisTick: { show: false },
+          min: 'dataMin',
+          max: 'dataMax',
+        },
+      ],
+      yAxis: [
+        {
+          scale: true,
+          position: 'right',
+          axisLine: { lineStyle: { color: '#2b3139' } },
+          axisLabel: {
+            color: '#848e9c',
+            fontSize: 11,
+            formatter: (value: number) => Number(value).toFixed(priceDigitsRef.current),
+          },
+          axisPointer: {
+            label: {
+              formatter: ({ value }: { value: number }) => formatPrice(Number(value), priceDigitsRef.current),
+            },
+          },
+          splitLine: { lineStyle: { color: '#1b1f27', width: 1 } },
+        },
+        {
+          gridIndex: 1,
+          scale: true,
+          position: 'right',
+          axisLine: { lineStyle: { color: '#2b3139' } },
+          axisLabel: {
+            color: '#848e9c',
+            fontSize: 11,
+            formatter: (value: number) =>
+              value >= 1e6 ? `${(value / 1e6).toFixed(1)}M` : value >= 1e3 ? `${(value / 1e3).toFixed(1)}K` : `${Math.round(value)}`,
+          },
+          splitLine: { show: false },
+        },
+      ],
+      dataZoom: [
+        {
+          type: 'inside',
+          xAxisIndex: [0, 1],
+          start: 0,
+          end: 100,
+          zoomOnMouseWheel: false,
+          moveOnMouseMove: true,
+          moveOnMouseWheel: true,
+          preventDefaultMouseMove: true,
+        },
+        {
+          type: 'slider',
+          xAxisIndex: [0, 1],
+          bottom: 8,
+          height: 18,
+          start: 0,
+          end: 100,
+          brushSelect: false,
+          fillerColor: 'rgba(132, 142, 156, 0.12)',
+          borderColor: '#2b3139',
+          handleStyle: { color: '#6b7280', borderColor: '#6b7280' },
+          moveHandleStyle: { color: '#6b7280' },
+          textStyle: { color: '#6b7280', fontSize: 10 },
+        },
+      ],
+      graphic: [buildWatermarkGraphic()],
+      series: [
+        {
+          name: 'K',
+          type: 'candlestick',
+          data: [],
+          itemStyle: {
+            color: upColor,
+            color0: downColor,
+            borderColor: upColor,
+            borderColor0: downColor,
+          },
+        },
+        {
+          name: 'MA7',
+          type: 'line',
+          data: [],
+          smooth: true,
+          showSymbol: false,
+          connectNulls: true,
+          lineStyle: { width: 1.5, color: '#f0b90b' },
+          tooltip: { show: false },
+        },
+        {
+          name: 'MA25',
+          type: 'line',
+          data: [],
+          smooth: true,
+          showSymbol: false,
+          connectNulls: true,
+          lineStyle: { width: 1.5, color: '#ED4D94' },
+          tooltip: { show: false },
+        },
+        {
+          name: 'MA99',
+          type: 'line',
+          data: [],
+          smooth: true,
+          showSymbol: false,
+          connectNulls: true,
+          lineStyle: { width: 1.5, color: '#7B61FF' },
+          tooltip: { show: false },
+        },
+        {
+          name: 'VOL',
+          type: 'bar',
+          xAxisIndex: 1,
+          yAxisIndex: 1,
+          data: [],
+          barWidth: '60%',
+          itemStyle: {
+            color: (params: any) => {
+              const idx = params?.dataIndex ?? 0
+              const cur = klinesRef.current[idx]
+              return cur && (cur.close ?? 0) >= (cur.open ?? 0) ? upColor : downColor
+            },
+            opacity: 0.85,
+          },
+          tooltip: { show: false },
+        },
+        {
+          name: 'Vol MA7',
+          type: 'line',
+          xAxisIndex: 1,
+          yAxisIndex: 1,
+          data: [],
+          smooth: true,
+          showSymbol: false,
+          connectNulls: true,
+          lineStyle: { width: 1, color: '#38bdf8' },
+          tooltip: { show: false },
+        },
+        {
+          name: 'Vol MA14',
+          type: 'line',
+          xAxisIndex: 1,
+          yAxisIndex: 1,
+          data: [],
+          smooth: true,
+          showSymbol: false,
+          connectNulls: true,
+          lineStyle: { width: 1, color: '#fb7185' },
+          tooltip: { show: false },
+        },
+      ],
+    })
+
+    chart.on('updateAxisPointer', (event: any) => {
+      const nextIndex = resolveDataIndex(event, chartDataRef.current?.times ?? [])
+      if (nextIndex == null) return
+      hoveredDataIndexRef.current = nextIndex
+      isHoveringRef.current = true
+      setHoveredIndex((cur) => (cur === nextIndex ? cur : nextIndex))
+    })
+
+    chart.on('datazoom', (event: any) => {
+      const payload = Array.isArray(event?.batch) ? event.batch[0] : event
+      const s = Number(payload?.start)
+      const e = Number(payload?.end)
+      if (Number.isFinite(s) && Number.isFinite(e)) {
+        dataZoomRef.current = { start: s, end: e }
+        return
       }
-      chart.on('datazoom', dataZoomHandlerRef.current)
-    }
-    if (!globalOutHandlerRef.current) {
-      globalOutHandlerRef.current = () => {
-        hoveredDataIndexRef.current = null
-        isHoveringRef.current = false
-        chart.dispatchAction({ type: 'hideTip' })
-        setHoveredIndex(null)
-        flushPendingRefresh()
+      const sv = Number(payload?.startValue)
+      const ev = Number(payload?.endValue)
+      const total = klinesRef.current.length
+      if (Number.isFinite(sv) && Number.isFinite(ev) && total > 1) {
+        dataZoomRef.current = { start: (sv / total) * 100, end: ((ev + 1) / total) * 100 }
       }
-      chart.getZr().on('globalout', globalOutHandlerRef.current)
+    })
+
+    chart.getZr().on('globalout', () => {
+      hoveredDataIndexRef.current = null
+      isHoveringRef.current = false
+      chart.dispatchAction({ type: 'hideTip' })
+      setHoveredIndex(null)
+      if (pendingRefreshRef.current) {
+        pendingRefreshRef.current = false
+        fromThrottleRef.current = true
+        setChartUpdateTrigger((v) => v + 1)
+      }
+    })
+
+    const onResize = () => chart.resize()
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      if (renderRaf.current) cancelAnimationFrame(renderRaf.current)
+      if (chartUpdateTimeoutRef.current != null) {
+        window.clearTimeout(chartUpdateTimeoutRef.current)
+        chartUpdateTimeoutRef.current = null
+      }
+      window.removeEventListener('resize', onResize)
+      chart.dispose()
+      chartInstance.current = null
     }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Data-only updates — partial setOption with just the changing parts
+  useEffect(() => {
+    const chart = chartInstance.current
+    if (!chart || klines.length === 0) return
 
     if (streaming && isHoveringRef.current) {
       pendingRefreshRef.current = true
@@ -195,7 +434,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
       chartUpdateTimeoutRef.current = window.setTimeout(() => {
         chartUpdateTimeoutRef.current = null
         fromThrottleRef.current = true
-        setChartUpdateTrigger((value) => value + 1)
+        setChartUpdateTrigger((v) => v + 1)
       }, throttleMs - elapsed)
       return () => {
         if (chartUpdateTimeoutRef.current != null) {
@@ -209,20 +448,23 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
     if (renderRaf.current) cancelAnimationFrame(renderRaf.current)
 
     renderRaf.current = requestAnimationFrame(() => {
-      const { times, values, volumes, ma7, ma25, ma99, volMA5, volMA10 } = chartData
-      const latestMetrics = getDisplayMetrics(klines, chartData, Math.max(klines.length - 1, 0))
-      const priceDigits = latestMetrics.priceDigits
+      const { times, values, volumes, ma7, ma25, ma99, volMA7, volMA14 } = chartData
+      const latestClose = klines[klines.length - 1]?.close ?? 0
+      const latestOpen = klines[klines.length - 1]?.open ?? 0
+      const priceDigits = latestClose < 1 ? 6 : latestClose < 100 ? 4 : 2
+      priceDigitsRef.current = priceDigits
 
       const bars = Math.max(1, visibleBars)
       const defaultStart = klines.length <= bars ? 0 : 100 - (bars / klines.length) * 100
-      const defaultEnd = 100
       const useDefaultZoom = lastChartUpdateRef.current === 0 || dataZoomRef.current == null
       let start = defaultStart
-      let end = defaultEnd
+      let end = 100
 
       if (!useDefaultZoom) {
-        const prevOpt = chartInstance.current?.getOption() as any
-        const zoom = Array.isArray(prevOpt?.dataZoom) ? prevOpt.dataZoom.find((item: any) => item.xAxisIndex != null) : null
+        const prevOpt = chart.getOption() as any
+        const zoom = Array.isArray(prevOpt?.dataZoom)
+          ? prevOpt.dataZoom.find((item: any) => item.xAxisIndex != null)
+          : null
         if (zoom?.start != null && zoom?.end != null) {
           start = Number(zoom.start)
           end = Number(zoom.end)
@@ -233,261 +475,50 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
       }
 
       dataZoomRef.current = { start, end }
-      const isFirstRender = lastChartUpdateRef.current === 0
 
-      const formatTimeLabel = (index: number) => {
-        return formatXAxisLabel(klines, index)
-      }
-
-      chartInstance.current?.setOption(
-        {
-          backgroundColor: '#0b0e11',
-          animation: false,
-          axisPointer: {
-            show: true,
-            link: [{ xAxisIndex: 'all' }],
-            label: {
-              backgroundColor: '#2b3139',
-              color: '#eaecef',
-              borderRadius: 2,
-              padding: [3, 6],
-            },
-            lineStyle: {
-              color: '#6b7280',
-              type: 'dashed',
-              width: 1,
-              opacity: 0.9,
+      chart.setOption({
+        xAxis: [{ data: times }, { data: times }],
+        dataZoom: [{ start, end }, { start, end }],
+        series: [
+          {
+            data: values,
+            markLine: {
+              symbol: ['none', 'none'],
+              label: {
+                show: true,
+                position: 'end',
+                formatter: () => formatPrice(latestClose, priceDigits),
+                color: '#ffffff',
+                opacity: 1,
+                fontSize: 12,
+                fontWeight: 500,
+                backgroundColor: latestClose >= latestOpen ? upColor : downColor,
+                padding: [3, 3, 3, 3],
+                borderRadius: 2,
+                distance: -2,
+              },
+              lineStyle: {
+                color: latestClose >= latestOpen ? upColor : downColor,
+                type: 'dashed',
+                width: 1,
+                opacity: 0.6,
+              },
+              data: [{ yAxis: latestClose }],
             },
           },
-          tooltip: {
-            show: true,
-            trigger: 'axis',
-            triggerOn: 'mousemove|click',
-            formatter: (params: any) => {
-              const nextIndex = resolveDataIndex(params, chartData.times)
-              if (nextIndex != null) {
-                hoveredDataIndexRef.current = nextIndex
-                isHoveringRef.current = true
-                setHoveredIndex((current) => (current === nextIndex ? current : nextIndex))
-              }
-              return ''
-            },
-            backgroundColor: 'transparent',
-            borderWidth: 0,
-            padding: 0,
-            textStyle: { color: 'transparent', fontSize: 0 },
-            extraCssText: 'box-shadow:none;',
-            axisPointer: { type: 'cross' },
-          },
-          grid: [
-            { left: 54, right: 72, top: 38, height: 348 },
-            { left: 54, right: 72, top: 402, height: 82 },
-          ],
-          xAxis: [
-            {
-              type: 'category',
-              data: times,
-              boundaryGap: true,
-              axisLine: { lineStyle: { color: '#2b3139' } },
-              axisLabel: {
-                show: false,
-              },
-              splitNumber: 7,
-              axisPointer: {
-                label: {
-                  formatter: (params: any) => {
-                    const index = resolveDataIndex({ axesInfo: [params] }, times)
-                    if (index == null) return ''
-                    return formatDateTime(klines[index]?.openTime ?? 0)
-                  },
-                },
-              },
-              splitLine: { show: false },
-              axisTick: { show: false },
-              min: 'dataMin',
-              max: 'dataMax',
-            },
-            {
-              type: 'category',
-              gridIndex: 1,
-              data: times,
-              boundaryGap: true,
-              axisLine: { lineStyle: { color: '#2b3139' } },
-              axisLabel: {
-                color: '#848e9c',
-                fontSize: 11,
-                hideOverlap: true,
-                margin: 14,
-                formatter: (_value: string, index: number) => formatTimeLabel(index),
-              },
-              splitLine: { show: false },
-              axisTick: { show: false },
-              min: 'dataMin',
-              max: 'dataMax',
-            },
-          ],
-          yAxis: [
-            {
-              scale: true,
-              position: 'right',
-              axisLine: { lineStyle: { color: '#2b3139' } },
-              axisLabel: { color: '#848e9c', fontSize: 11, formatter: (value: number) => Number(value).toFixed(priceDigits) },
-              axisPointer: {
-                label: {
-                  formatter: ({ value }: { value: number }) => formatPrice(Number(value), priceDigits),
-                },
-              },
-              splitLine: { lineStyle: { color: '#1b1f27', width: 1 } },
-            },
-            {
-              gridIndex: 1,
-              scale: true,
-              position: 'right',
-              axisLine: { lineStyle: { color: '#2b3139' } },
-              axisLabel: {
-                color: '#848e9c',
-                fontSize: 11,
-                formatter: (value: number) => (value >= 1e6 ? `${(value / 1e6).toFixed(1)}M` : value >= 1e3 ? `${(value / 1e3).toFixed(1)}K` : `${Math.round(value)}`),
-              },
-              splitLine: { show: false },
-            },
-          ],
-          dataZoom: [
-            {
-              type: 'inside',
-              xAxisIndex: [0, 1],
-              start,
-              end,
-              zoomOnMouseWheel: false,
-              moveOnMouseMove: true,
-              moveOnMouseWheel: true,
-              preventDefaultMouseMove: true,
-            },
-            {
-              type: 'slider',
-              xAxisIndex: [0, 1],
-              bottom: 8,
-              height: 18,
-              start,
-              end,
-              brushSelect: false,
-              fillerColor: 'rgba(132, 142, 156, 0.12)',
-              borderColor: '#2b3139',
-              handleStyle: { color: '#6b7280', borderColor: '#6b7280' },
-              moveHandleStyle: { color: '#6b7280' },
-              textStyle: { color: '#6b7280', fontSize: 10 },
-            },
-          ],
-          graphic: [
-            buildWatermarkGraphic(),
-          ],
-          series: [
-            {
-              name: 'K',
-              type: 'candlestick',
-              data: values,
-              itemStyle: {
-                color: upColor,
-                color0: downColor,
-                borderColor: upColor,
-                borderColor0: downColor,
-              },
-              markLine: {
-                symbol: ['none', 'none'],
-                label: {
-                  show: true,
-                  formatter: () => `${(klines[klines.length - 1]?.close ?? 0).toFixed(priceDigits)}`,
-                  color: '#ffffff',
-                  backgroundColor: (klines[klines.length - 1]?.close ?? 0) >= (klines[klines.length - 1]?.open ?? 0) ? upColor : downColor,
-                  padding: [3, 6],
-                  borderRadius: 3,
-                  distance: 6,
-                },
-                lineStyle: { color: '#848e9c', type: 'dashed', width: 1, opacity: 0.5 },
-                data: [{ yAxis: klines[klines.length - 1]?.close ?? 0 }],
-              },
-            },
-            {
-              name: 'MA7',
-              type: 'line',
-              data: ma7,
-              smooth: true,
-              showSymbol: false,
-              connectNulls: true,
-              lineStyle: { width: 1.5, color: '#f0b90b' },
-              tooltip: { show: false },
-            },
-            {
-              name: 'MA25',
-              type: 'line',
-              data: ma25,
-              smooth: true,
-              showSymbol: false,
-              connectNulls: true,
-              lineStyle: { width: 1.5, color: '#c994ff' },
-              tooltip: { show: false },
-            },
-            {
-              name: 'MA99',
-              type: 'line',
-              data: ma99,
-              smooth: true,
-              showSymbol: false,
-              connectNulls: true,
-              lineStyle: { width: 1.5, color: '#a78bfa' },
-              tooltip: { show: false },
-            },
-            {
-              name: 'VOL',
-              type: 'bar',
-              xAxisIndex: 1,
-              yAxisIndex: 1,
-              data: volumes,
-              barWidth: '60%',
-              itemStyle: {
-                color: (params: any) => {
-                  const index = params?.dataIndex ?? 0
-                  const current = klines[index]
-                  return current && (current.close ?? 0) >= (current.open ?? 0) ? upColor : downColor
-                },
-                opacity: 0.85,
-              },
-              tooltip: { show: false },
-            },
-            {
-              name: 'Vol MA5',
-              type: 'line',
-              xAxisIndex: 1,
-              yAxisIndex: 1,
-              data: volMA5,
-              smooth: true,
-              showSymbol: false,
-              connectNulls: true,
-              lineStyle: { width: 1, color: '#38bdf8' },
-              tooltip: { show: false },
-            },
-            {
-              name: 'Vol MA10',
-              type: 'line',
-              xAxisIndex: 1,
-              yAxisIndex: 1,
-              data: volMA10,
-              smooth: true,
-              showSymbol: false,
-              connectNulls: true,
-              lineStyle: { width: 1, color: '#fb7185' },
-              tooltip: { show: false },
-            },
-          ],
-        },
-        false,
-      )
+          { data: ma7 },
+          { data: ma25 },
+          { data: ma99 },
+          { data: volumes },
+          { data: volMA7 },
+          { data: volMA14 },
+        ],
+      })
 
-      chartInstance.current?.resize()
+      chart.resize()
       lastChartUpdateRef.current = Date.now()
     })
 
-    chartInstance.current.resize()
     return () => {
       if (chartUpdateTimeoutRef.current != null) {
         window.clearTimeout(chartUpdateTimeoutRef.current)
@@ -495,30 +526,6 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
       }
     }
   }, [chartData, chartUpdateTrigger, klines, streaming, visibleBars])
-
-  useEffect(() => {
-    const chart = chartInstance.current
-    const onResize = () => chart?.resize()
-    window.addEventListener('resize', onResize)
-    return () => {
-      if (renderRaf.current) cancelAnimationFrame(renderRaf.current)
-      if (chart && updateAxisPointerHandlerRef.current) {
-        chart.off('updateAxisPointer', updateAxisPointerHandlerRef.current)
-      }
-      if (chart && dataZoomHandlerRef.current) {
-        chart.off('datazoom', dataZoomHandlerRef.current)
-      }
-      if (chart && globalOutHandlerRef.current) {
-        chart.getZr().off('globalout', globalOutHandlerRef.current)
-      }
-      window.removeEventListener('resize', onResize)
-      chart?.dispose()
-      chartInstance.current = null
-      updateAxisPointerHandlerRef.current = null
-      dataZoomHandlerRef.current = null
-      globalOutHandlerRef.current = null
-    }
-  }, [])
 
   return (
     <div
@@ -565,13 +572,13 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
           <span style={metricLabelStyle}>MA(7) </span>
           <span style={metricValueStyle('#f0b90b')}>{displayMetrics.ma7 != null ? formatPrice(displayMetrics.ma7, displayMetrics.priceDigits) : '-'}</span>
         </span>
-        <span style={metricCellStyle(126, '#d946ef')}>
+        <span style={metricCellStyle(126, '#ED4D94')}>
           <span style={metricLabelStyle}>MA(25) </span>
-          <span style={metricValueStyle('#d946ef')}>{displayMetrics.ma25 != null ? formatPrice(displayMetrics.ma25, displayMetrics.priceDigits) : '-'}</span>
+          <span style={metricValueStyle('#ED4D94')}>{displayMetrics.ma25 != null ? formatPrice(displayMetrics.ma25, displayMetrics.priceDigits) : '-'}</span>
         </span>
-        <span style={metricCellStyle(126, '#7c3aed')}>
+        <span style={metricCellStyle(126, '#7B61FF')}>
           <span style={metricLabelStyle}>MA(99) </span>
-          <span style={metricValueStyle('#7c3aed')}>{displayMetrics.ma99 != null ? formatPrice(displayMetrics.ma99, displayMetrics.priceDigits) : '-'}</span>
+          <span style={metricValueStyle('#7B61FF')}>{displayMetrics.ma99 != null ? formatPrice(displayMetrics.ma99, displayMetrics.priceDigits) : '-'}</span>
         </span>
       </div>
       <div style={overlayRowStyle(398, 54, 10)}>
@@ -584,12 +591,10 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
           <span style={metricValueStyle('#eaecef')}>{formatVolume(displayMetrics.quoteVolume)}</span>
         </span>
         <span style={metricCellStyle(84, '#38bdf8')}>
-          <span style={metricLabelStyle}>MA5 </span>
-          <span style={metricValueStyle('#38bdf8')}>{displayMetrics.volMA5 != null ? formatVolume(displayMetrics.volMA5) : '-'}</span>
+          <span style={metricValueStyle('#38bdf8')}>{latestVolMA7 != null ? formatVolume(latestVolMA7) : '-'}</span>
         </span>
         <span style={metricCellStyle(88, '#fb7185')}>
-          <span style={metricLabelStyle}>MA10 </span>
-          <span style={metricValueStyle('#fb7185')}>{displayMetrics.volMA10 != null ? formatVolume(displayMetrics.volMA10) : '-'}</span>
+          <span style={metricValueStyle('#fb7185')}>{latestVolMA14 != null ? formatVolume(latestVolMA14) : '-'}</span>
         </span>
       </div>
       <div
@@ -614,8 +619,8 @@ function buildChartData(klines: KLine[]) {
       ma7: calcMA(7, klines),
       ma25: calcMA(25, klines),
       ma99: calcMA(99, klines),
-      volMA5: calcVolMA(5, klines),
-      volMA10: calcVolMA(10, klines),
+      volMA7: calcVolMA(7, klines),
+      volMA14: calcVolMA(14, klines),
     }
 }
 
@@ -635,8 +640,8 @@ function getDisplayMetrics(klines: KLine[], chartData: ReturnType<typeof buildCh
   const ma7 = chartData.ma7[index]
   const ma25 = chartData.ma25[index]
   const ma99 = chartData.ma99[index]
-  const volMA5 = chartData.volMA5[index]
-  const volMA10 = chartData.volMA10[index]
+  const volMA7 = chartData.volMA7[index]
+  const volMA14 = chartData.volMA14[index]
 
   return {
     timeText,
@@ -653,8 +658,8 @@ function getDisplayMetrics(klines: KLine[], chartData: ReturnType<typeof buildCh
     ma7,
     ma25,
     ma99,
-    volMA5,
-    volMA10,
+    volMA7,
+    volMA14,
   }
 }
 

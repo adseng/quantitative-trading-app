@@ -35,6 +35,7 @@ export function useCozeKlineStream(symbol: string, interval: string, limit: numb
   const requestIdRef = useRef(0)
   const streamIntentRef = useRef(false)
   const sessionIdRef = useRef<string | null>(null)
+  const mountedRef = useRef(true)
   const symbolRef = useRef(symbol)
   const intervalRef = useRef(interval)
 
@@ -60,6 +61,7 @@ export function useCozeKlineStream(symbol: string, interval: string, limit: numb
   }, [matchesCurrentMarket])
 
   const mergeKline = useCallback((nextKline: KLine) => {
+    if (!mountedRef.current) return
     setKlines((prev) => {
       const idx = prev.findIndex((item) => item.openTime === nextKline.openTime)
       if (idx >= 0) {
@@ -81,16 +83,16 @@ export function useCozeKlineStream(symbol: string, interval: string, limit: numb
 
     try {
       const data = await FetchKlines(symbol, interval, normalizedLimit)
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current || !mountedRef.current) return
       const list = Array.isArray(data) ? data.map((item: unknown) => createKLine(item)) : []
       setKlines(list)
       setLastUpdate(nowText())
     } catch (error: any) {
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current || !mountedRef.current) return
       const errMsg = error?.message || '加载 K 线失败'
       setLoadError(errMsg)
     } finally {
-      if (requestId === requestIdRef.current) {
+      if (requestId === requestIdRef.current && mountedRef.current) {
         setLoading(false)
       }
     }
@@ -167,9 +169,12 @@ export function useCozeKlineStream(symbol: string, interval: string, limit: numb
 
   useEffect(() => {
     return () => {
-      if (!streamIntentRef.current) return
-      streamIntentRef.current = false
-      void StopKlineStream()
+      mountedRef.current = false
+      requestIdRef.current++
+      if (streamIntentRef.current) {
+        streamIntentRef.current = false
+        void StopKlineStream()
+      }
     }
   }, [])
 
@@ -179,6 +184,7 @@ export function useCozeKlineStream(symbol: string, interval: string, limit: numb
     try {
       await StartKlineStream(symbolRef.current, intervalRef.current, normalizeLimit(normalizedLimit))
     } catch (error: any) {
+      if (!mountedRef.current) return
       const errMsg = error?.message || '启动实时流失败'
       streamIntentRef.current = false
       sessionIdRef.current = null

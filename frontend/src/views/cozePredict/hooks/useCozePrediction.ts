@@ -35,6 +35,7 @@ export function useCozePrediction(symbol: string, interval: string, count: numbe
   const [cozePreview, setCozePreview] = useState<string | null>(null)
 
   const predictingRef = useRef(false)
+  const mountedRef = useRef(true)
   const symbolRef = useRef(symbol)
   const intervalRef = useRef(interval)
   const countRef = useRef(normalizedCount)
@@ -51,14 +52,18 @@ export function useCozePrediction(symbol: string, interval: string, count: numbe
 
   useEffect(() => {
     const unsubscribe = EventsOn('coze:status', (event: CozeStatusEvent) => {
+      if (!mountedRef.current) return
       if (!event || event.symbol !== symbolRef.current || event.interval !== intervalRef.current) return
       setCozeStatus(formatStatus(event))
     })
-    return () => unsubscribe?.()
+    return () => {
+      mountedRef.current = false
+      unsubscribe?.()
+    }
   }, [])
 
   const triggerPredict = useCallback(async () => {
-    if (predictingRef.current) return null
+    if (predictingRef.current || !mountedRef.current) return null
 
     predictingRef.current = true
     setPredicting(true)
@@ -66,17 +71,19 @@ export function useCozePrediction(symbol: string, interval: string, count: numbe
       const result = coze.CozeStructuredResult.createFrom(
         await CozePredictStructured(symbolRef.current, intervalRef.current, countRef.current),
       )
+      if (!mountedRef.current) return null
       appendResult(result)
       setCozeStatus('完成')
       return result
     } catch (error: any) {
+      if (!mountedRef.current) return null
       const errMsg = error?.message || '预测失败'
       setCozeStatus(`失败: ${errMsg}`)
       message.error(errMsg)
       return null
     } finally {
       predictingRef.current = false
-      setPredicting(false)
+      if (mountedRef.current) setPredicting(false)
     }
   }, [appendResult])
 
