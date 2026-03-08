@@ -20,8 +20,4 @@ export function LogBacktestResult(arg1:string,arg2:string,arg3:number,arg4:boole
 
 export function StartBatchTest():Promise<void>;
 
-export function StartKlineStream(arg1:string,arg2:string,arg3:number):Promise<void>;
-
 export function StopBatchTest():Promise<void>;
-
-export function StopKlineStream():Promise<void>;

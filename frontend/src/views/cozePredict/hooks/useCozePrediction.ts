@@ -35,6 +35,8 @@ export function useCozePrediction(symbol: string, interval: string, count: numbe
   const [cozePreview, setCozePreview] = useState<string | null>(null)
 
   const predictingRef = useRef(false)
+  const requestIdRef = useRef(0)
+  const marketVersionRef = useRef(0)
   const mountedRef = useRef(true)
   const symbolRef = useRef(symbol)
   const intervalRef = useRef(interval)
@@ -51,6 +53,16 @@ export function useCozePrediction(symbol: string, interval: string, count: numbe
   }, [])
 
   useEffect(() => {
+    marketVersionRef.current += 1
+    requestIdRef.current += 1
+    predictingRef.current = false
+    setPredicting(false)
+    setResults([])
+    setCozeStatus(null)
+    setCozePreview(null)
+  }, [interval, symbol])
+
+  useEffect(() => {
     const unsubscribe = EventsOn('coze:status', (event: CozeStatusEvent) => {
       if (!mountedRef.current) return
       if (!event || event.symbol !== symbolRef.current || event.interval !== intervalRef.current) return
@@ -65,25 +77,29 @@ export function useCozePrediction(symbol: string, interval: string, count: numbe
   const triggerPredict = useCallback(async () => {
     if (predictingRef.current || !mountedRef.current) return null
 
+    const requestId = ++requestIdRef.current
+    const marketVersion = marketVersionRef.current
     predictingRef.current = true
     setPredicting(true)
     try {
       const result = coze.CozeStructuredResult.createFrom(
         await CozePredictStructured(symbolRef.current, intervalRef.current, countRef.current),
       )
-      if (!mountedRef.current) return null
+      if (!mountedRef.current || requestId !== requestIdRef.current || marketVersion !== marketVersionRef.current) return null
       appendResult(result)
       setCozeStatus('完成')
       return result
     } catch (error: any) {
-      if (!mountedRef.current) return null
+      if (!mountedRef.current || requestId !== requestIdRef.current || marketVersion !== marketVersionRef.current) return null
       const errMsg = error?.message || '预测失败'
       setCozeStatus(`失败: ${errMsg}`)
       message.error(errMsg)
       return null
     } finally {
-      predictingRef.current = false
-      if (mountedRef.current) setPredicting(false)
+      if (requestId === requestIdRef.current && marketVersion === marketVersionRef.current) {
+        predictingRef.current = false
+        if (mountedRef.current) setPredicting(false)
+      }
     }
   }, [appendResult])
 

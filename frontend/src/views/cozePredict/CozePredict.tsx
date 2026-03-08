@@ -45,7 +45,7 @@ export default function CozePredict() {
     triggerPredict,
   } = useCozePrediction(symbol, interval, cozeKlineCount)
 
-  const streamActive = streaming || streamStatus === 'starting' || streamStatus === 'retrying'
+  const streamActive = streaming
   const summaryText = useMemo(() => {
     const parts = [
       `${klines.length} 根`,
@@ -112,7 +112,7 @@ export default function CozePredict() {
             style={{ width: 88 }}
           />
           <Button type="primary" onClick={() => void startStream()} disabled={streamActive}>
-            启动实时流
+            启动实时轮询
           </Button>
           <Button onClick={() => void stopStream()} disabled={!streamActive}>
             停止

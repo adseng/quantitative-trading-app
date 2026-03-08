@@ -34,14 +34,6 @@ export function StartBatchTest() {
   return window['go']['main']['App']['StartBatchTest']();
 }
 
-export function StartKlineStream(arg1, arg2, arg3) {
-  return window['go']['main']['App']['StartKlineStream'](arg1, arg2, arg3);
-}
-
 export function StopBatchTest() {
   return window['go']['main']['App']['StopBatchTest']();
-}
-
-export function StopKlineStream() {
-  return window['go']['main']['App']['StopKlineStream']();
 }

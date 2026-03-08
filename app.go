@@ -108,14 +108,6 @@ func (a *App) GetBatchTestResults(maxN int) []cases.TestResult {
 
 // CozePredict
 
-func (a *App) StartKlineStream(symbol, interval string, limit int64) error {
-	return a.service.StartKlineStream(symbol, interval, limit)
-}
-
-func (a *App) StopKlineStream() {
-	a.service.StopKlineStream()
-}
-
 func (a *App) CozePredictStructured(symbol, interval string, count int) (*coze.CozeStructuredResult, error) {
 	return a.service.CozePredictStructured(symbol, interval, count)
 }
