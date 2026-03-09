@@ -178,8 +178,8 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
         axisPointer: { type: 'cross' },
       },
       grid: [
-        { left: 54, right: 72, top: 38, height: 348 },
-        { left: 54, right: 72, top: 402, height: 82 },
+        { left: 54, right: 72, top: 38, height: 372 },
+        { left: 54, right: 72, top: 426, height: 90 },
       ],
       xAxis: [
         {
@@ -534,8 +534,8 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
       style={{
         position: 'relative',
         width: '100%',
-        minHeight: 520,
-        height: 520,
+        minHeight: 552,
+        height: 552,
         background: '#0b0e11',
         border: '1px solid #1e2329',
         borderRadius: 6,

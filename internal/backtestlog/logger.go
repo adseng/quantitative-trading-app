@@ -10,7 +10,7 @@ import (
 )
 
 const sheetName = "Sheet1"
-const defaultFileName = "backtest_log.xlsx"
+const defaultFileName = "docs/backtest_log.xlsx"
 
 var headers = []string{
 	"时间", "交易对", "周期", "数量",
