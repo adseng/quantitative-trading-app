@@ -11,6 +11,11 @@ dayjs.locale('zh-cn')
 
 const theme = {
   token: {
+    colorPrimary: '#ec4899',
+    colorLink: '#ec4899',
+    colorLinkHover: '#f472b6',
+    colorPrimaryHover: '#f472b6',
+    colorPrimaryActive: '#db2777',
     colorText: '#242f57',
     controlHeight: 40,
   },

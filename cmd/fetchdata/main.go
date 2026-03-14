@@ -1,10 +1,9 @@
 package main
 
 import (
-	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"quantitative-trading-app/internal/binance"
 	"quantitative-trading-app/internal/config"
@@ -15,48 +14,36 @@ func main() {
 	_ = config.Load()
 	binance.InitClient()
 
-	outFile := datafile.DefaultPath
+	symbol := flag.String("symbol", config.Get(config.KeySymbol, "BTCUSDT"), "trading symbol")
+	interval := flag.String("interval", "15m", "kline interval, e.g. 1m/5m/15m/1h")
+	count := flag.Int("count", 10000, "number of klines to fetch")
+	out := flag.String("out", "", "output file path")
+	force := flag.Bool("force", false, "overwrite output file when it already exists")
+	flag.Parse()
 
-	if info, err := os.Stat(outFile); err == nil && info.Size() > 0 {
+	outFile := *out
+	if outFile == "" {
+		outFile = datafile.DefaultKlinePath(*interval, *count)
+	}
+
+	if info, err := os.Stat(outFile); err == nil && info.Size() > 0 && !*force {
 		fmt.Printf("%s already exists (%d bytes), skip fetching.\n", outFile, info.Size())
-		fmt.Println("Delete the file to re-fetch.")
+		fmt.Println("Use -force to overwrite the file.")
 		return
 	}
 
-	fmt.Println("Fetching BTCUSDT 15m klines: 100 rounds × 1000 per round ...")
+	fmt.Printf("Fetching %s %s klines: %d bars\n", *symbol, *interval, *count)
 
-	cancel := make(chan struct{})
-	klines, err := binance.FetchKlines("BTCUSDT", "15m", 0, &binance.FetchKlinesOpts{
-		PerReq:  1000,
-		Chunks:  100,
-		DelayMs: 600,
-		ProgressFn: func(round, totalRounds, fetched int) {
-			fmt.Printf("  round %d/%d, total fetched: %d\n", round, totalRounds, fetched)
-		},
-		CancelCh: cancel,
-	})
+	klines, err := binance.FetchKlines(*symbol, *interval, int64(*count))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fetch error: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("Fetched %d klines, writing to %s ...\n", len(klines), outFile)
-
-	_ = os.MkdirAll(filepath.Dir(outFile), 0o755)
-
-	f, err := os.Create(outFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "create file error: %v\n", err)
+	if err := datafile.SaveKlines(outFile, klines); err != nil {
+		fmt.Fprintf(os.Stderr, "write error: %v\n", err)
 		os.Exit(1)
-	}
-	defer f.Close()
-
-	enc := json.NewEncoder(f)
-	for _, kl := range klines {
-		if err := enc.Encode(kl); err != nil {
-			fmt.Fprintf(os.Stderr, "write error: %v\n", err)
-			os.Exit(1)
-		}
 	}
 
 	fmt.Printf("Done. %d klines saved to %s\n", len(klines), outFile)

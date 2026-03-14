@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import * as echarts from 'echarts'
 
-import type { KLine } from '../types'
+import type { BacktestTrade, KLine, StrategySignal } from '../types'
 
 const upColor = '#0ECB81'
 const downColor = '#F6465D'
@@ -96,9 +96,11 @@ interface KlineChartProps {
   klines: KLine[]
   streaming: boolean
   visibleBars: number
+  signals?: StrategySignal[]
+  trades?: BacktestTrade[]
 }
 
-export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) {
+export function KlineChart({ klines, streaming, visibleBars, signals = [], trades = [] }: KlineChartProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<echarts.ECharts | null>(null)
   const renderRaf = useRef<number | null>(null)
@@ -116,6 +118,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
   const [chartUpdateTrigger, setChartUpdateTrigger] = useState(0)
 
   const chartData = useMemo(() => buildChartData(klines), [klines])
+  const overlayData = useMemo(() => buildOverlayData(signals, trades, chartData.times), [chartData.times, signals, trades])
   chartDataRef.current = chartData
   klinesRef.current = klines
   const displayIndex =
@@ -359,6 +362,33 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
           lineStyle: { width: 1, color: '#fb7185' },
           tooltip: { show: false },
         },
+        {
+          name: 'Signals',
+          type: 'scatter',
+          data: [],
+          symbolSize: 11,
+          tooltip: { show: false },
+          itemStyle: { color: '#facc15' },
+          z: 10,
+        },
+        {
+          name: 'Entries',
+          type: 'scatter',
+          data: [],
+          symbolSize: 12,
+          tooltip: { show: false },
+          itemStyle: { color: '#38bdf8' },
+          z: 11,
+        },
+        {
+          name: 'Exits',
+          type: 'scatter',
+          data: [],
+          symbolSize: 10,
+          tooltip: { show: false },
+          itemStyle: { color: '#ffffff' },
+          z: 11,
+        },
       ],
     })
 
@@ -514,6 +544,9 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
           { data: volumes },
           { data: volMA7 },
           { data: volMA14 },
+          { data: overlayData.signals },
+          { data: overlayData.entries },
+          { data: overlayData.exits },
         ],
       })
 
@@ -527,7 +560,7 @@ export function KlineChart({ klines, streaming, visibleBars }: KlineChartProps) 
         chartUpdateTimeoutRef.current = null
       }
     }
-  }, [chartData, chartUpdateTrigger, klines, streaming, visibleBars])
+  }, [chartData, chartUpdateTrigger, klines, overlayData, streaming, visibleBars])
 
   return (
     <div
@@ -624,6 +657,38 @@ function buildChartData(klines: KLine[]) {
       volMA7: calcVolMA(7, klines),
       volMA14: calcVolMA(14, klines),
     }
+}
+
+function buildOverlayData(signals: StrategySignal[], trades: BacktestTrade[], times: string[]) {
+  const signalPoints = signals
+    .filter((signal) => signal.triggerIndex >= 0 && signal.triggerIndex < times.length)
+    .map((signal) => ({
+      value: [times[signal.triggerIndex], signal.direction === 'LONG' ? signal.boxHigh : signal.boxLow],
+      symbol: signal.direction === 'LONG' ? 'triangle' : 'diamond',
+      itemStyle: { color: signal.direction === 'LONG' ? '#22c55e' : '#ef4444' },
+    }))
+
+  const entryPoints = trades
+    .filter((trade) => trade.entryIndex >= 0 && trade.entryIndex < times.length)
+    .map((trade) => ({
+      value: [times[trade.entryIndex], trade.entryPrice],
+      symbol: trade.direction === 'LONG' ? 'arrow' : 'pin',
+      itemStyle: { color: '#38bdf8' },
+    }))
+
+  const exitPoints = trades
+    .filter((trade) => trade.exitIndex >= 0 && trade.exitIndex < times.length)
+    .map((trade) => ({
+      value: [times[trade.exitIndex], trade.exitPrice],
+      symbol: 'circle',
+      itemStyle: { color: trade.pnl >= 0 ? '#22c55e' : '#ef4444' },
+    }))
+
+  return {
+    signals: signalPoints,
+    entries: entryPoints,
+    exits: exitPoints,
+  }
 }
 
 function getDisplayMetrics(klines: KLine[], chartData: ReturnType<typeof buildChartData>, index: number) {

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"quantitative-trading-app/internal/config"
-	"quantitative-trading-app/internal/factor"
+	"quantitative-trading-app/internal/market"
 
 	binanceclient "github.com/binance/binance-connector-go/clients/derivativestradingusdsfutures"
 	"github.com/binance/binance-connector-go/clients/derivativestradingusdsfutures/src/restapi/models"
@@ -21,6 +21,11 @@ import (
 var (
 	binanceClient *binanceclient.BinanceDerivativesTradingUsdsFuturesClient
 	clientOnce    sync.Once
+)
+
+const (
+	maxKlinesPerRequest = int64(1000)
+	fixedChunkDelayMs   = 300
 )
 
 func parseProxyConfig(proxyURL string) (common.ProxyConfig, bool) {
@@ -122,19 +127,20 @@ func parseInt64(v models.KlineCandlestickDataResponseItemInner) int64 {
 	return *v.Int64
 }
 
-// FetchKlinesOpts 分页拉取时的可选参数；nil 时单次请求（limit 上限 1500）。
+// FetchKlinesOpts 分页拉取时的可选控制参数。
 type FetchKlinesOpts struct {
-	PerReq     int64  // 每轮请求根数，默认 1500
-	Chunks     int    // 请求轮数
-	DelayMs    int    // 轮间延迟（毫秒）
 	ProgressFn func(round, totalRounds, fetched int)
 	CancelCh   <-chan struct{}
 }
 
 // FetchKlines 获取合约 K 线数据，按时间升序返回。
 // symbol 交易对，interval 周期（1m/5m/15m/1h 等），limit 根数。
-// 当 opts 为 nil 且 limit<=1500 时单次请求；当 opts 非 nil 或 limit>1500 时分页请求。
-func FetchKlines(symbol, interval string, limit int64, opts *FetchKlinesOpts) ([]*factor.KLine, error) {
+// 当 limit 大于单次上限时会自动分页拉取，并使用固定轮间延迟。
+func FetchKlines(symbol, interval string, limit int64) ([]*market.KLine, error) {
+	return fetchKlinesWithOpts(symbol, interval, limit, nil)
+}
+
+func fetchKlinesWithOpts(symbol, interval string, limit int64, opts *FetchKlinesOpts) ([]*market.KLine, error) {
 	if symbol == "" {
 		symbol = config.Get(config.KeySymbol, "BTCUSDT")
 	}
@@ -143,28 +149,31 @@ func FetchKlines(symbol, interval string, limit int64, opts *FetchKlinesOpts) ([
 	}
 	intervalParam := parseIntervalParam(interval)
 
-	if opts == nil {
-		if limit <= 0 {
-			limit = 100
-		}
-		if limit > 1500 {
-			limit = 1500
-		}
-		return fetchKlinesSingle(symbol, intervalParam, limit)
+	if limit <= 0 {
+		limit = 100
 	}
-
-	perReq := opts.PerReq
-	if perReq <= 0 {
-		perReq = 1000
+	perReq := limit
+	if perReq > maxKlinesPerRequest {
+		perReq = maxKlinesPerRequest
 	}
-	if perReq > 1500 {
-		perReq = 1500
-	}
-	chunks := opts.Chunks
-	if chunks <= 0 {
+	chunks := int((limit + maxKlinesPerRequest - 1) / maxKlinesPerRequest)
+	if chunks < 1 {
 		chunks = 1
 	}
-	return fetchKlinesChunked(symbol, intervalParam, perReq, chunks, opts.DelayMs, opts.ProgressFn, opts.CancelCh)
+	var progressFn func(round, totalRounds, fetched int)
+	var cancelCh <-chan struct{}
+	if opts != nil {
+		progressFn = opts.ProgressFn
+		cancelCh = opts.CancelCh
+	}
+	klines, err := fetchKlinesChunked(symbol, intervalParam, perReq, chunks, fixedChunkDelayMs, progressFn, cancelCh)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(klines)) > limit {
+		klines = klines[len(klines)-int(limit):]
+	}
+	return klines, nil
 }
 
 func parseIntervalParam(interval string) models.ContinuousContractKlineCandlestickDataIntervalParameter {
@@ -190,29 +199,14 @@ func parseIntervalParam(interval string) models.ContinuousContractKlineCandlesti
 	}
 }
 
-func fetchKlinesSingle(symbol string, intervalParam models.ContinuousContractKlineCandlestickDataIntervalParameter, limit int64) ([]*factor.KLine, error) {
-	resp, err := Client().RestApi.MarketDataAPI.KlineCandlestickData(context.Background()).
-		Symbol(symbol).
-		Interval(intervalParam).
-		Limit(limit).
-		Execute()
-	if err != nil {
-		return nil, err
-	}
-	if resp == nil || resp.Data.Items == nil {
-		return nil, nil
-	}
-	return parseKlineItems(resp.Data.Items), nil
-}
-
 func fetchKlinesChunked(
 	symbol string,
 	intervalParam models.ContinuousContractKlineCandlestickDataIntervalParameter,
 	perReq int64, chunks int, delayMs int,
 	progressFn func(round, totalRounds, fetched int),
 	cancelCh <-chan struct{},
-) ([]*factor.KLine, error) {
-	allMap := make(map[int64]*factor.KLine)
+) ([]*market.KLine, error) {
+	allMap := make(map[int64]*market.KLine)
 	var endTime *int64
 
 	for round := 0; round < chunks; round++ {
@@ -262,13 +256,13 @@ func fetchKlinesChunked(
 	return mapToSlice(allMap), nil
 }
 
-func parseKlineItems(items []models.KlineCandlestickDataResponseItem) []*factor.KLine {
-	out := make([]*factor.KLine, 0, len(items))
+func parseKlineItems(items []models.KlineCandlestickDataResponseItem) []*market.KLine {
+	out := make([]*market.KLine, 0, len(items))
 	for _, item := range items {
 		if len(item.Items) < 11 {
 			continue
 		}
-		out = append(out, &factor.KLine{
+		out = append(out, &market.KLine{
 			OpenTime:            parseInt64(item.Items[0]),
 			Open:                parseFloat(item.Items[1]),
 			High:                parseFloat(item.Items[2]),
@@ -285,8 +279,8 @@ func parseKlineItems(items []models.KlineCandlestickDataResponseItem) []*factor.
 	return out
 }
 
-func mapToSlice(m map[int64]*factor.KLine) []*factor.KLine {
-	result := make([]*factor.KLine, 0, len(m))
+func mapToSlice(m map[int64]*market.KLine) []*market.KLine {
+	result := make([]*market.KLine, 0, len(m))
 	for _, kl := range m {
 		result = append(result, kl)
 	}

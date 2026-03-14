@@ -1,37 +1,35 @@
 import { useMemo, useState } from 'react'
 import { Alert, Button, Card, Descriptions, InputNumber, Select, Statistic } from 'antd'
 
-import { KlineChart } from './components/KlineChart'
-import { PredictionResults } from './components/PredictionResults'
-import { useBacktestRunner } from './hooks/useBacktestRunner'
-import { useCozeKlineStream } from './hooks/useCozeKlineStream'
-import type { BoxPullbackParams } from './types'
+import { KlineChart } from '@/views/cozePredict/components/KlineChart'
+import { PredictionResults } from '@/views/cozePredict/components/PredictionResults'
+import { useCozeKlineStream } from '@/views/cozePredict/hooks/useCozeKlineStream'
+import type { EMATrendPullbackParams } from '@/views/cozePredict/types'
+import { useEMABacktestRunner } from './hooks/useEMABacktestRunner'
 
-const STRATEGY_NAME = 'box-pullback-confirmation'
+const STRATEGY_NAME = 'ema-trend-pullback-confirmation'
 
 function normalizeVisibleBars(value: number | null): number {
   if (value == null) return 100
   return Math.min(500, Math.max(10, Number(value)))
 }
 
-export default function CozePredict() {
+export default function EMATrendPullback() {
   const [interval, setInterval] = useState('15m')
   const [limit, setLimit] = useState(100000)
   const [visibleBars, setVisibleBars] = useState(100)
   const [initialBalance, setInitialBalance] = useState(10000)
   const [positionSizeUSDT, setPositionSizeUSDT] = useState(100)
-  const [params, setParams] = useState<BoxPullbackParams>({
-    lookaheadN: 5,
-    minK1BodyPercent: 0.003,
-    k1StrengthLookback: 20,
-    minK1BodyToAvgRatio: 1.5,
-    trendMAPeriod: 50,
-    minBoxRangePercent: 0.002,
-    maxBoxRangePercent: 0.03,
-    touchTolerancePercent: 0.001,
-    minConfirmWickBodyRatio: 1.2,
+  const [params, setParams] = useState<EMATrendPullbackParams>({
+    fastPeriod: 20,
+    slowPeriod: 60,
+    breakoutLookback: 20,
+    pullbackLookahead: 5,
+    pullbackTolerancePercent: 0.003,
+    atrPeriod: 14,
+    stopATRMultiplier: 1,
     cooldownBars: 3,
-    riskRewardRatio: 2,
+    riskRewardRatio: 1.5,
   })
 
   const {
@@ -44,7 +42,7 @@ export default function CozePredict() {
     loadFromFile,
   } = useCozeKlineStream(interval, limit)
 
-  const { running, error: backtestError, report, execute } = useBacktestRunner()
+  const { running, error: backtestError, report, execute } = useEMABacktestRunner()
 
   const summaryText = useMemo(() => {
     const parts = [
@@ -71,13 +69,13 @@ export default function CozePredict() {
     })
   }
 
-  const updateParams = <K extends keyof BoxPullbackParams>(key: K, value: BoxPullbackParams[K]) => {
+  const updateParams = <K extends keyof EMATrendPullbackParams>(key: K, value: EMATrendPullbackParams[K]) => {
     setParams((current) => ({ ...current, [key]: value }))
   }
 
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-medium text-[#242f57]">箱体突破回踩确认策略</h1>
+      <h1 className="text-xl font-medium text-[#242f57]">EMA 趋势回踩确认策略</h1>
 
       <Card title="数据源">
         <div className="space-y-3">
@@ -115,28 +113,24 @@ export default function CozePredict() {
 
       <Card title="回测参数">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-gray-600">观察窗口</span>
-          <InputNumber min={1} max={20} value={params.lookaheadN} onChange={(value) => updateParams('lookaheadN', value == null ? 5 : Number(value))} />
-          <span className="text-sm text-gray-600">K1 实体阈值</span>
-          <InputNumber min={0.0001} max={0.05} step={0.0001} value={params.minK1BodyPercent} onChange={(value) => updateParams('minK1BodyPercent', value == null ? 0.003 : Number(value))} />
-          <span className="text-sm text-gray-600">K1 强度窗口</span>
-          <InputNumber min={3} max={200} value={params.k1StrengthLookback} onChange={(value) => updateParams('k1StrengthLookback', value == null ? 20 : Number(value))} />
-          <span className="text-sm text-gray-600">K1/均值倍数</span>
-          <InputNumber min={0.5} max={10} step={0.1} value={params.minK1BodyToAvgRatio} onChange={(value) => updateParams('minK1BodyToAvgRatio', value == null ? 1.5 : Number(value))} />
-          <span className="text-sm text-gray-600">趋势均线</span>
-          <InputNumber min={5} max={300} value={params.trendMAPeriod} onChange={(value) => updateParams('trendMAPeriod', value == null ? 50 : Number(value))} />
-          <span className="text-sm text-gray-600">最小箱体波动</span>
-          <InputNumber min={0.0001} max={0.1} step={0.0001} value={params.minBoxRangePercent} onChange={(value) => updateParams('minBoxRangePercent', value == null ? 0.002 : Number(value))} />
-          <span className="text-sm text-gray-600">最大箱体波动</span>
-          <InputNumber min={0.001} max={0.2} step={0.001} value={params.maxBoxRangePercent} onChange={(value) => updateParams('maxBoxRangePercent', value == null ? 0.03 : Number(value))} />
+          <span className="text-sm text-gray-600">快 EMA</span>
+          <InputNumber min={2} max={100} value={params.fastPeriod} onChange={(value) => updateParams('fastPeriod', value == null ? 20 : Number(value))} />
+          <span className="text-sm text-gray-600">慢 EMA</span>
+          <InputNumber min={5} max={300} value={params.slowPeriod} onChange={(value) => updateParams('slowPeriod', value == null ? 60 : Number(value))} />
+          <span className="text-sm text-gray-600">突破窗口</span>
+          <InputNumber min={2} max={200} value={params.breakoutLookback} onChange={(value) => updateParams('breakoutLookback', value == null ? 20 : Number(value))} />
+          <span className="text-sm text-gray-600">回踩观察</span>
+          <InputNumber min={1} max={20} value={params.pullbackLookahead} onChange={(value) => updateParams('pullbackLookahead', value == null ? 5 : Number(value))} />
           <span className="text-sm text-gray-600">回踩容差</span>
-          <InputNumber min={0} max={0.02} step={0.0001} value={params.touchTolerancePercent} onChange={(value) => updateParams('touchTolerancePercent', value == null ? 0.001 : Number(value))} />
-          <span className="text-sm text-gray-600">影线/实体</span>
-          <InputNumber min={0.1} max={5} step={0.1} value={params.minConfirmWickBodyRatio} onChange={(value) => updateParams('minConfirmWickBodyRatio', value == null ? 1.2 : Number(value))} />
+          <InputNumber min={0} max={0.02} step={0.0001} value={params.pullbackTolerancePercent} onChange={(value) => updateParams('pullbackTolerancePercent', value == null ? 0.003 : Number(value))} />
+          <span className="text-sm text-gray-600">ATR 周期</span>
+          <InputNumber min={2} max={100} value={params.atrPeriod} onChange={(value) => updateParams('atrPeriod', value == null ? 14 : Number(value))} />
+          <span className="text-sm text-gray-600">止损 ATR 倍数</span>
+          <InputNumber min={0.2} max={5} step={0.1} value={params.stopATRMultiplier} onChange={(value) => updateParams('stopATRMultiplier', value == null ? 1 : Number(value))} />
           <span className="text-sm text-gray-600">冷却 K 线</span>
           <InputNumber min={0} max={20} value={params.cooldownBars} onChange={(value) => updateParams('cooldownBars', value == null ? 3 : Number(value))} />
           <span className="text-sm text-gray-600">盈亏比</span>
-          <InputNumber min={0.5} max={5} step={0.1} value={params.riskRewardRatio} onChange={(value) => updateParams('riskRewardRatio', value == null ? 2 : Number(value))} />
+          <InputNumber min={0.5} max={5} step={0.1} value={params.riskRewardRatio} onChange={(value) => updateParams('riskRewardRatio', value == null ? 1.5 : Number(value))} />
           <span className="text-sm text-gray-600">初始资金</span>
           <InputNumber min={100} step={100} value={initialBalance} onChange={(value) => setInitialBalance(value == null ? 10000 : Number(value))} />
           <span className="text-sm text-gray-600">单次下单</span>

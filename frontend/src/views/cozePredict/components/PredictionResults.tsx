@@ -1,71 +1,56 @@
 import { Table, Tag } from 'antd'
 
-import type { CozeResult, CozeScenario } from '../types'
-
-const scenarioOrder = ['LONG', 'SHORT', 'SIDEWAYS'] as const
-
-function sortScenarios(list: CozeScenario[] | undefined) {
-  if (!list?.length) return []
-  return [...list].sort((left, right) => scenarioOrder.indexOf(left.direction as any) - scenarioOrder.indexOf(right.direction as any))
-}
-
-const scenarioColumns = [
-  { title: '方向', dataIndex: 'direction', key: 'direction', width: 80 },
-  { title: '概率', dataIndex: 'probability', key: 'probability', width: 60, render: (value: number) => `${value}%` },
-  { title: '入场', dataIndex: 'entry_price', key: 'entry_price', width: 90, render: (value: number | null) => (value != null ? value.toFixed(2) : '-') },
-  { title: '止损', dataIndex: 'stop_loss', key: 'stop_loss', width: 90, render: (value: number | null) => (value != null ? value.toFixed(2) : '-') },
-  { title: '止盈1', dataIndex: 'take_profit_1', key: 'take_profit_1', width: 90, render: (value: number | null) => (value != null ? value.toFixed(2) : '-') },
-  { title: '止盈2', dataIndex: 'take_profit_2', key: 'take_profit_2', width: 90, render: (value: number | null) => (value != null ? value.toFixed(2) : '-') },
-  { title: '风报比', dataIndex: 'risk_reward_ratio', key: 'risk_reward_ratio', width: 70, render: (value: number | null) => (value != null ? value.toFixed(1) : '-') },
-  {
-    title: '动作',
-    dataIndex: 'action',
-    key: 'action',
-    width: 80,
-    render: (action: string) => {
-      const config: Record<string, { color: string }> = {
-        EXECUTE: { color: 'green' },
-        WAIT: { color: 'orange' },
-        SKIP: { color: 'default' },
-      }
-      return <Tag color={(config[action] ?? { color: 'default' }).color}>{action || '-'}</Tag>
-    },
-  },
-  { title: '触发条件', dataIndex: 'trigger_condition', key: 'trigger_condition', ellipsis: true },
-]
+import type { BacktestTrade } from '../types'
 
 interface PredictionResultsProps {
-  results: CozeResult[]
+  results: BacktestTrade[]
 }
+
+const columns = [
+  {
+    title: '方向',
+    dataIndex: 'direction',
+    key: 'direction',
+    width: 86,
+    render: (value: string) => <Tag color={value === 'LONG' ? 'green' : 'volcano'}>{value}</Tag>,
+  },
+  { title: '开仓时间', dataIndex: 'entryTime', key: 'entryTime', width: 150, render: (value: number) => formatDateTime(value) },
+  { title: '平仓时间', dataIndex: 'exitTime', key: 'exitTime', width: 150, render: (value: number) => formatDateTime(value) },
+  { title: '开仓价', dataIndex: 'entryPrice', key: 'entryPrice', width: 96, render: formatPrice },
+  { title: '平仓价', dataIndex: 'exitPrice', key: 'exitPrice', width: 96, render: formatPrice },
+  { title: '止损', dataIndex: 'stopLoss', key: 'stopLoss', width: 96, render: formatPrice },
+  { title: '止盈', dataIndex: 'takeProfit', key: 'takeProfit', width: 96, render: formatPrice },
+  { title: '盈亏', dataIndex: 'pnl', key: 'pnl', width: 96, render: formatPnl },
+  { title: '盈亏%', dataIndex: 'pnlPercent', key: 'pnlPercent', width: 86, render: (value: number) => `${value.toFixed(2)}%` },
+  { title: '持仓K线', dataIndex: 'holdBars', key: 'holdBars', width: 90 },
+  { title: '原因', dataIndex: 'exitReason', key: 'exitReason', width: 180 },
+  { title: '余额', dataIndex: 'balanceAfter', key: 'balanceAfter', width: 108, render: formatPrice },
+]
 
 export function PredictionResults({ results }: PredictionResultsProps) {
   if (results.length === 0) {
-    return <div className="text-gray-500 py-8 text-center">暂无预测结果</div>
+    return <div className="text-gray-500 py-8 text-center">暂无订单结果</div>
   }
 
-  return (
-    <div className="space-y-4">
-      {results.map((result, index) => (
-        <div key={`${result.timestamp}-${index}`} className="border rounded p-3 bg-gray-50/50">
-          <div className="flex gap-4 mb-2 text-sm">
-            <span>{result.timestamp}</span>
-            <span>{result.symbol}</span>
-            <span>当前价: {result.current_price?.toFixed(2)}</span>
-            <span className="text-gray-600">{result.market_structure || result.resultType}</span>
-          </div>
-          {result.rawAnswer && !result.scenarios?.length ? (
-            <pre className="text-xs overflow-auto max-h-32 whitespace-pre-wrap">{result.rawAnswer}</pre>
-          ) : (
-            <Table
-              dataSource={sortScenarios(result.scenarios)}
-              columns={scenarioColumns}
-              rowKey="direction"
-              size="small"
-              pagination={false}
-            />
-          )}
-        </div>
-      ))}
-    </div>
-  )
+  return <Table rowKey="id" dataSource={results} columns={columns} size="small" scroll={{ x: 1300 }} pagination={{ pageSize: 10 }} />
+}
+
+function formatDateTime(value: number): string {
+  if (!value) return '-'
+  const date = new Date(value)
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  const hours = `${date.getHours()}`.padStart(2, '0')
+  const minutes = `${date.getMinutes()}`.padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}`
+}
+
+function formatPrice(value: number): string {
+  return Number(value || 0).toFixed(2)
+}
+
+function formatPnl(value: number): JSX.Element {
+  const color = value >= 0 ? '#16a34a' : '#dc2626'
+  return <span style={{ color }}>{value.toFixed(2)}</span>
 }

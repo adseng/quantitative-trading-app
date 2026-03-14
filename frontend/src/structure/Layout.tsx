@@ -20,10 +20,14 @@ export default function Layout() {
             <NavLink
               key={menu.value}
               to={menu.value}
+              style={({ isActive }) => ({
+                color: isActive ? '#ec4899' : '#9ca3af',
+                fontWeight: isActive ? 500 : 400,
+              })}
               className={({ isActive }) =>
                 twMerge(
-                  'flex items-center gap-1 text-[#242f57] no-underline',
-                  isActive ? 'font-medium text-blue-600' : 'hover:text-blue-500'
+                  'flex items-center gap-1 no-underline transition-colors',
+                  isActive ? '' : 'hover:text-gray-500'
                 )
               }
             >
