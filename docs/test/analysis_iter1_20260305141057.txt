@@ -1,9 +1,0 @@
-Iteration: 1
-Time: 2026-03-05 14:10:57
-Excel: batch_test_log_20260305141057.xlsx
-Duration: 12ms
-Cases: 1
-Signal Accuracy: best=52.37% top10avg=52.37% avg=52.37% worst=52.37%
-
-=== TOP 10 ===
- 1. #1   Session                                  Acc=52.37% Rate=66.6% Str=1.000 Avg=-0.009
