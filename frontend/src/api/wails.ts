@@ -1,4 +1,4 @@
-import type { BacktestReport, EMABacktestReport, KLine, RunBacktestRequest, RunEMABacktestRequest } from '@/views/cozePredict/types'
+import type { BacktestReport, BoxRangeBacktestReport, EMABacktestReport, KLine, RunBacktestRequest, RunBoxRangeBacktestRequest, RunEMABacktestRequest } from '@/views/cozePredict/types'
 
 declare global {
   interface Window {
@@ -8,6 +8,7 @@ declare global {
           LoadLocalKlines: (path: string) => Promise<KLine[]>
           RunBacktest: (req: RunBacktestRequest) => Promise<BacktestReport>
           RunEMABacktest: (req: RunEMABacktestRequest) => Promise<EMABacktestReport>
+          RunBoxRangeBacktest: (req: RunBoxRangeBacktestRequest) => Promise<BoxRangeBacktestReport>
         }
       }
     }
@@ -33,4 +34,8 @@ export async function runBacktest(req: RunBacktestRequest): Promise<BacktestRepo
 
 export async function runEMABacktest(req: RunEMABacktestRequest): Promise<EMABacktestReport> {
   return appApi().RunEMABacktest(req)
+}
+
+export async function runBoxRangeBacktest(req: RunBoxRangeBacktestRequest): Promise<BoxRangeBacktestReport> {
+  return appApi().RunBoxRangeBacktest(req)
 }

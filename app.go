@@ -42,3 +42,8 @@ func (a *App) RunBacktest(req backtest.RunRequest) (backtest.Report, error) {
 func (a *App) RunEMABacktest(req backtest.RunEMARequest) (backtest.EMAReport, error) {
 	return a.service.RunEMABacktest(req)
 }
+
+// RunBoxRangeBacktest 从本地文件加载 K 线并运行箱体震荡反转策略回测。
+func (a *App) RunBoxRangeBacktest(req backtest.RunBoxRangeRequest) (backtest.BoxRangeReport, error) {
+	return a.service.RunBoxRangeBacktest(req)
+}

@@ -10,6 +10,7 @@ const (
 const (
 	BoxPullbackName      = "box-pullback-confirmation"
 	EMATrendPullbackName = "ema-trend-pullback-confirmation"
+	BoxRangeReversalName = "box-range-reversal"
 )
 
 type BoxPullbackParams struct {
@@ -36,6 +37,24 @@ type EMATrendPullbackParams struct {
 	StopATRMultiplier        float64 `json:"stopATRMultiplier"`
 	CooldownBars             int     `json:"cooldownBars"`
 	RiskRewardRatio          float64 `json:"riskRewardRatio"`
+}
+
+type BoxRangeReversalParams struct {
+	ImpulseLookback          int     `json:"impulseLookback"`
+	ConsolidationLookback    int     `json:"consolidationLookback"`
+	ATRPeriod                int     `json:"atrPeriod"`
+	MinImpulsePercent        float64 `json:"minImpulsePercent"`
+	MinImpulseATRRatio       float64 `json:"minImpulseATRRatio"`
+	MinBoxWidthPercent       float64 `json:"minBoxWidthPercent"`
+	MaxBoxWidthPercent       float64 `json:"maxBoxWidthPercent"`
+	ConsolidationVolumeRatio float64 `json:"consolidationVolumeRatio"`
+	ConsolidationATRRatio    float64 `json:"consolidationATRRatio"`
+	MinBoundaryTouches       int     `json:"minBoundaryTouches"`
+	EdgeTolerancePercent     float64 `json:"edgeTolerancePercent"`
+	MinRejectWickBodyRatio   float64 `json:"minRejectWickBodyRatio"`
+	StopATRMultiplier        float64 `json:"stopATRMultiplier"`
+	CooldownBars             int     `json:"cooldownBars"`
+	TakeProfitFactor         float64 `json:"takeProfitFactor"`
 }
 
 func DefaultBoxPullbackParams() BoxPullbackParams {
@@ -65,6 +84,26 @@ func DefaultEMATrendPullbackParams() EMATrendPullbackParams {
 		StopATRMultiplier:        1,
 		CooldownBars:             3,
 		RiskRewardRatio:          1.5,
+	}
+}
+
+func DefaultBoxRangeReversalParams() BoxRangeReversalParams {
+	return BoxRangeReversalParams{
+		ImpulseLookback:          30,
+		ConsolidationLookback:    12,
+		ATRPeriod:                14,
+		MinImpulsePercent:        0.03,
+		MinImpulseATRRatio:       2.5,
+		MinBoxWidthPercent:       0.003,
+		MaxBoxWidthPercent:       0.015,
+		ConsolidationVolumeRatio: 0.7,
+		ConsolidationATRRatio:    0.7,
+		MinBoundaryTouches:       2,
+		EdgeTolerancePercent:     0.002,
+		MinRejectWickBodyRatio:   1.5,
+		StopATRMultiplier:        0.8,
+		CooldownBars:             2,
+		TakeProfitFactor:         0.5,
 	}
 }
 
@@ -140,6 +179,65 @@ func (p EMATrendPullbackParams) Normalize() EMATrendPullbackParams {
 	}
 	if p.RiskRewardRatio <= 0 {
 		p.RiskRewardRatio = defaults.RiskRewardRatio
+	}
+
+	return p
+}
+
+func (p BoxRangeReversalParams) Normalize() BoxRangeReversalParams {
+	defaults := DefaultBoxRangeReversalParams()
+
+	if p.ImpulseLookback <= 1 {
+		p.ImpulseLookback = defaults.ImpulseLookback
+	}
+	if p.ConsolidationLookback <= 2 {
+		p.ConsolidationLookback = defaults.ConsolidationLookback
+	}
+	if p.ATRPeriod <= 1 {
+		p.ATRPeriod = defaults.ATRPeriod
+	}
+	if p.MinImpulsePercent <= 0 {
+		p.MinImpulsePercent = defaults.MinImpulsePercent
+	}
+	if p.MinImpulseATRRatio <= 0 {
+		p.MinImpulseATRRatio = defaults.MinImpulseATRRatio
+	}
+	if p.MinBoxWidthPercent <= 0 {
+		p.MinBoxWidthPercent = defaults.MinBoxWidthPercent
+	}
+	if p.MaxBoxWidthPercent <= 0 {
+		p.MaxBoxWidthPercent = defaults.MaxBoxWidthPercent
+	}
+	if p.MinBoxWidthPercent > p.MaxBoxWidthPercent {
+		p.MinBoxWidthPercent = defaults.MinBoxWidthPercent
+		p.MaxBoxWidthPercent = defaults.MaxBoxWidthPercent
+	}
+	if p.ConsolidationVolumeRatio <= 0 {
+		p.ConsolidationVolumeRatio = defaults.ConsolidationVolumeRatio
+	}
+	if p.ConsolidationATRRatio <= 0 {
+		p.ConsolidationATRRatio = defaults.ConsolidationATRRatio
+	}
+	if p.MinBoundaryTouches <= 0 {
+		p.MinBoundaryTouches = defaults.MinBoundaryTouches
+	}
+	if p.EdgeTolerancePercent < 0 {
+		p.EdgeTolerancePercent = defaults.EdgeTolerancePercent
+	}
+	if p.MinRejectWickBodyRatio <= 0 {
+		p.MinRejectWickBodyRatio = defaults.MinRejectWickBodyRatio
+	}
+	if p.StopATRMultiplier <= 0 {
+		p.StopATRMultiplier = defaults.StopATRMultiplier
+	}
+	if p.CooldownBars < 0 {
+		p.CooldownBars = defaults.CooldownBars
+	}
+	if p.TakeProfitFactor < 0 {
+		p.TakeProfitFactor = 0
+	}
+	if p.TakeProfitFactor > 1 {
+		p.TakeProfitFactor = 1
 	}
 
 	return p

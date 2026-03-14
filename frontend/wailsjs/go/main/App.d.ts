@@ -7,4 +7,6 @@ export function LoadLocalKlines(arg1:string):Promise<Array<market.KLine>>;
 
 export function RunBacktest(arg1:backtest.RunRequest):Promise<backtest.Report>;
 
+export function RunBoxRangeBacktest(arg1:backtest.RunBoxRangeRequest):Promise<backtest.BoxRangeReport>;
+
 export function RunEMABacktest(arg1:backtest.RunEMARequest):Promise<backtest.EMAReport>;

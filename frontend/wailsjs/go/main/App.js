@@ -10,6 +10,10 @@ export function RunBacktest(arg1) {
   return window['go']['main']['App']['RunBacktest'](arg1);
 }
 
+export function RunBoxRangeBacktest(arg1) {
+  return window['go']['main']['App']['RunBoxRangeBacktest'](arg1);
+}
+
 export function RunEMABacktest(arg1) {
   return window['go']['main']['App']['RunEMABacktest'](arg1);
 }

@@ -80,6 +80,56 @@ export namespace backtest {
 	        this.holdBars = source["holdBars"];
 	    }
 	}
+	export class BoxRangeReport {
+	    strategyName: string;
+	    dataPath: string;
+	    resultPath: string;
+	    generatedAt: string;
+	    initialBalance: number;
+	    positionSizeUSDT: number;
+	    params: strategy.BoxRangeReversalParams;
+	    klines: market.KLine[];
+	    signals: strategy.Signal[];
+	    trades: Trade[];
+	    summary: Summary;
+	
+	    static createFrom(source: any = {}) {
+	        return new BoxRangeReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.strategyName = source["strategyName"];
+	        this.dataPath = source["dataPath"];
+	        this.resultPath = source["resultPath"];
+	        this.generatedAt = source["generatedAt"];
+	        this.initialBalance = source["initialBalance"];
+	        this.positionSizeUSDT = source["positionSizeUSDT"];
+	        this.params = this.convertValues(source["params"], strategy.BoxRangeReversalParams);
+	        this.klines = this.convertValues(source["klines"], market.KLine);
+	        this.signals = this.convertValues(source["signals"], strategy.Signal);
+	        this.trades = this.convertValues(source["trades"], Trade);
+	        this.summary = this.convertValues(source["summary"], Summary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class EMAReport {
 	    strategyName: string;
 	    dataPath: string;
@@ -160,6 +210,46 @@ export namespace backtest {
 	        this.signals = this.convertValues(source["signals"], strategy.Signal);
 	        this.trades = this.convertValues(source["trades"], Trade);
 	        this.summary = this.convertValues(source["summary"], Summary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RunBoxRangeRequest {
+	    dataPath: string;
+	    strategyName: string;
+	    params: strategy.BoxRangeReversalParams;
+	    initialBalance: number;
+	    positionSizeUSDT: number;
+	    resultPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunBoxRangeRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dataPath = source["dataPath"];
+	        this.strategyName = source["strategyName"];
+	        this.params = this.convertValues(source["params"], strategy.BoxRangeReversalParams);
+	        this.initialBalance = source["initialBalance"];
+	        this.positionSizeUSDT = source["positionSizeUSDT"];
+	        this.resultPath = source["resultPath"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -333,6 +423,46 @@ export namespace strategy {
 	        this.minConfirmWickBodyRatio = source["minConfirmWickBodyRatio"];
 	        this.cooldownBars = source["cooldownBars"];
 	        this.riskRewardRatio = source["riskRewardRatio"];
+	    }
+	}
+	export class BoxRangeReversalParams {
+	    impulseLookback: number;
+	    consolidationLookback: number;
+	    atrPeriod: number;
+	    minImpulsePercent: number;
+	    minImpulseATRRatio: number;
+	    minBoxWidthPercent: number;
+	    maxBoxWidthPercent: number;
+	    consolidationVolumeRatio: number;
+	    consolidationATRRatio: number;
+	    minBoundaryTouches: number;
+	    edgeTolerancePercent: number;
+	    minRejectWickBodyRatio: number;
+	    stopATRMultiplier: number;
+	    cooldownBars: number;
+	    takeProfitFactor: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BoxRangeReversalParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.impulseLookback = source["impulseLookback"];
+	        this.consolidationLookback = source["consolidationLookback"];
+	        this.atrPeriod = source["atrPeriod"];
+	        this.minImpulsePercent = source["minImpulsePercent"];
+	        this.minImpulseATRRatio = source["minImpulseATRRatio"];
+	        this.minBoxWidthPercent = source["minBoxWidthPercent"];
+	        this.maxBoxWidthPercent = source["maxBoxWidthPercent"];
+	        this.consolidationVolumeRatio = source["consolidationVolumeRatio"];
+	        this.consolidationATRRatio = source["consolidationATRRatio"];
+	        this.minBoundaryTouches = source["minBoundaryTouches"];
+	        this.edgeTolerancePercent = source["edgeTolerancePercent"];
+	        this.minRejectWickBodyRatio = source["minRejectWickBodyRatio"];
+	        this.stopATRMultiplier = source["stopATRMultiplier"];
+	        this.cooldownBars = source["cooldownBars"];
+	        this.takeProfitFactor = source["takeProfitFactor"];
 	    }
 	}
 	export class EMATrendPullbackParams {

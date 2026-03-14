@@ -61,6 +61,23 @@ func (s *Service) RunEMABacktest(req backtest.RunEMARequest) (backtest.EMAReport
 	return *report, nil
 }
 
+func (s *Service) RunBoxRangeBacktest(req backtest.RunBoxRangeRequest) (backtest.BoxRangeReport, error) {
+	req = req.Normalize()
+	if req.ResultPath == "" {
+		req.ResultPath = backtest.DefaultBoxRangeResultPath(req.StrategyName)
+	}
+	req.ResultPath = filepath.ToSlash(req.ResultPath)
+
+	report, err := backtest.RunBoxRange(req)
+	if err != nil {
+		return backtest.BoxRangeReport{}, err
+	}
+	if err := backtest.SaveBoxRangeReport(req.ResultPath, report); err != nil {
+		return backtest.BoxRangeReport{}, err
+	}
+	return *report, nil
+}
+
 func valuesFromPointers(items []*market.KLine) []market.KLine {
 	out := make([]market.KLine, 0, len(items))
 	for _, item := range items {

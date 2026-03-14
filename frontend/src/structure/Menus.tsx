@@ -8,6 +8,11 @@ export const MENUS = [
     icon: <LineChartOutlined className="text-[20px]" />,
   },
   {
+    label: '箱体震荡反转',
+    value: ROUTES.BOX_RANGE_REVERSAL,
+    icon: <LineChartOutlined className="text-[20px]" />,
+  },
+  {
     label: '箱体突破回踩',
     value: ROUTES.BOX_PULLBACK,
     icon: <LineChartOutlined className="text-[20px]" />,

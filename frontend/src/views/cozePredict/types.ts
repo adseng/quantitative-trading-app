@@ -40,6 +40,24 @@ export interface EMATrendPullbackParams {
   riskRewardRatio: number
 }
 
+export interface BoxRangeReversalParams {
+  impulseLookback: number
+  consolidationLookback: number
+  atrPeriod: number
+  minImpulsePercent: number
+  minImpulseATRRatio: number
+  minBoxWidthPercent: number
+  maxBoxWidthPercent: number
+  consolidationVolumeRatio: number
+  consolidationATRRatio: number
+  minBoundaryTouches: number
+  edgeTolerancePercent: number
+  minRejectWickBodyRatio: number
+  stopATRMultiplier: number
+  cooldownBars: number
+  takeProfitFactor: number
+}
+
 export interface StrategySignal {
   strategyName: string
   direction: Direction
@@ -126,6 +144,20 @@ export interface EMABacktestReport {
   summary: BacktestSummary
 }
 
+export interface BoxRangeBacktestReport {
+  strategyName: string
+  dataPath: string
+  resultPath: string
+  generatedAt: string
+  initialBalance: number
+  positionSizeUSDT: number
+  params: BoxRangeReversalParams
+  klines: KLine[]
+  signals: StrategySignal[]
+  trades: BacktestTrade[]
+  summary: BacktestSummary
+}
+
 export interface RunBacktestRequest {
   dataPath: string
   strategyName: string
@@ -139,6 +171,15 @@ export interface RunEMABacktestRequest {
   dataPath: string
   strategyName: string
   params: EMATrendPullbackParams
+  initialBalance: number
+  positionSizeUSDT: number
+  resultPath: string
+}
+
+export interface RunBoxRangeBacktestRequest {
+  dataPath: string
+  strategyName: string
+  params: BoxRangeReversalParams
   initialBalance: number
   positionSizeUSDT: number
   resultPath: string
